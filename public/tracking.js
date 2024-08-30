@@ -28,6 +28,4 @@
       timestamp: new Date().toISOString()
     });
   });
-
-  // Track other events as needed
 })();
