@@ -3,7 +3,6 @@ const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
-
 require('dotenv').config();
 
 const app = express();
@@ -17,26 +16,34 @@ app.use(bodyParser.json());
 console.log('MongoDB URI:', process.env.MONGO_URI);
 
 // MongoDB Connection
-const mongoURI = process.env.MONGO_URI;
-if (!mongoURI) {
-  console.error('MONGO_URI environment variable is not set');
-  process.exit(1);
-}
-
-mongoose.connect(mongoURI)
+mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log('MongoDB connected'))
-  .catch(err => console.error('MongoDB connection error:', err));
+  .catch(err => console.log('MongoDB connection error:', err));
 
-// Simple route for health check
-app.get('/', (req, res) => {
-  res.send('API is running...');
+// Define a Mongoose schema for tracking data
+const trackingSchema = new mongoose.Schema({
+  type: String,
+  url: String,
+  element: String,
+  timestamp: String
 });
 
-// Import and use your routes
-const pageViews = require('./routes/pageViews');
-app.use('/api/pageviews', pageViews);
+const Tracking = mongoose.model('Tracking', trackingSchema);
 
-// Serve static files from the 'public' directory 
+// Endpoint to handle tracking data
+app.post('/api/pageviews', async (req, res) => {
+  try {
+    const data = req.body;
+    await Tracking.create(data);
+    console.log('Tracking data received:', data);
+    res.status(200).send('Data received');
+  } catch (error) {
+    console.error('Error saving tracking data:', error);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+// Serve static files from the 'public' directory
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Serve the dashboard page
