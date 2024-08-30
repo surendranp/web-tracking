@@ -17,9 +17,15 @@ app.use(bodyParser.json());
 console.log('MongoDB URI:', process.env.MONGO_URI);
 
 // MongoDB Connection
-mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+const mongoURI = process.env.MONGO_URI;
+if (!mongoURI) {
+  console.error('MONGO_URI environment variable is not set');
+  process.exit(1);
+}
+
+mongoose.connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log('MongoDB connected'))
-  .catch(err => console.log('MongoDB connection error:', err));
+  .catch(err => console.error('MongoDB connection error:', err));
 
 // Simple route for health check
 app.get('/', (req, res) => {
