@@ -36,7 +36,7 @@ app.get('/', (req, res) => {
 const pageViews = require('./routes/pageViews');
 app.use('/api/pageviews', pageViews);
 
-// Serve static files from the 'public' directory
+// Serve static files from the 'public' directory 
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Serve the dashboard page
