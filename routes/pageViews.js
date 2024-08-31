@@ -3,16 +3,18 @@ const router = express.Router();
 const mongoose = require('mongoose');
 
 // Define the schema for tracking data
+const activitySchema = new mongoose.Schema({
+  type: String,
+  url: String,
+  buttonName: { type: String, default: null },
+  linkName: { type: String, default: null },
+  count: { type: Number, default: 0 },
+  timestamp: Date
+});
+
 const trackingSchema = new mongoose.Schema({
   sessionId: String,
-  activities: [{
-    type: String,
-    url: String,
-    buttonName: String,
-    linkName: String,
-    count: Number,
-    timestamp: Date
-  }],
+  activities: [activitySchema], // Use activitySchema to define the structure of each activity
   sessionStart: Date,
   sessionEnd: Date
 });
