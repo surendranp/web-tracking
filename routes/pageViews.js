@@ -31,7 +31,7 @@ router.post('/', async (req, res) => {
       // End session and update session end time
       await Tracking.findOneAndUpdate(
         { sessionId: sessionId },
-        { $set: { sessionEnd: new Date(timestamp) } },
+        { $set: { sessionEnd: timestamp } },
         { new: true }
       );
     } else {
@@ -40,15 +40,15 @@ router.post('/', async (req, res) => {
         url: url,
         buttonName: buttonName || null,
         linkName: linkName || null,
-        count: count || 0,
-        timestamp: new Date(timestamp)
+        count: count || null,
+        timestamp: timestamp
       };
 
       // Upsert (update or insert) the document
       await Tracking.findOneAndUpdate(
         { sessionId: sessionId },
         { 
-          $setOnInsert: { sessionStart: new Date(timestamp) }, // Set session start if document is new
+          $setOnInsert: { sessionStart: timestamp }, // Set session start if document is new
           $push: { activities: activity } 
         },
         { new: true, upsert: true }
