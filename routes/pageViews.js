@@ -6,7 +6,8 @@ const mongoose = require('mongoose');
 const trackingSchema = new mongoose.Schema({
   type: String,
   url: String,
-  element: String,
+  buttonName: String,
+  count: Number,
   timestamp: Date
 });
 
