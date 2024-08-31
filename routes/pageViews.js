@@ -5,11 +5,8 @@ const mongoose = require('mongoose');
 // Define the schema for tracking data
 const trackingSchema = new mongoose.Schema({
   type: String,
-  sessionId: String,
   url: String,
-  buttonName: String,
-  linkName: String,
-  count: Number,
+  element: String,
   timestamp: Date
 });
 
