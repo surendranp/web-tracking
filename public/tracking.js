@@ -26,14 +26,12 @@
     timestamp: new Date().toISOString()
   });
 
-  // Track click events for buttons and navbar links
+  // Track click events
   const buttonClicks = {};
 
   document.addEventListener('click', function(event) {
-    const target = event.target;
-
-    if (target.tagName === 'BUTTON') {
-      const buttonName = target.innerText || target.id || 'Unnamed Button';
+    if (event.target.tagName === 'BUTTON') {
+      const buttonName = event.target.innerText || event.target.id || 'Unnamed Button';
 
       if (!buttonClicks[buttonName]) {
         buttonClicks[buttonName] = 0;
@@ -45,16 +43,6 @@
         sessionId: sessionId,
         buttonName: buttonName,
         count: buttonClicks[buttonName],
-        url: window.location.href,
-        timestamp: new Date().toISOString()
-      });
-    } else if (target.tagName === 'A' && target.closest('.navbar')) {
-      const linkName = target.innerText || target.href || 'Unnamed Link';
-
-      sendTrackingData({
-        type: 'navbar_click',
-        sessionId: sessionId,
-        linkName: linkName,
         url: window.location.href,
         timestamp: new Date().toISOString()
       });
