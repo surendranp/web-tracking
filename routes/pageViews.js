@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 
-// Define the schema for tracking data
+// Define the schema for each activity
 const activitySchema = new mongoose.Schema({
   type: String,
   url: String,
@@ -12,9 +12,10 @@ const activitySchema = new mongoose.Schema({
   timestamp: Date
 });
 
+// Define the schema for tracking data
 const trackingSchema = new mongoose.Schema({
   sessionId: String,
-  activities: [activitySchema], // Use activitySchema to define the structure of each activity
+  activities: [activitySchema], // Embed the activity schema
   sessionStart: Date,
   sessionEnd: Date
 });
