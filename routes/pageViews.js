@@ -3,20 +3,12 @@ const router = express.Router();
 const mongoose = require('mongoose');
 
 // Define the schema for tracking data
-const activitySchema = new mongoose.Schema({
+const trackingSchema = new mongoose.Schema({
   type: String,
   url: String,
-  buttonName: { type: String, default: null },
-  linkName: { type: String, default: null },
-  count: { type: Number, default: 0 },
+  buttonName: String,
+  count: Number,
   timestamp: Date
-});
-
-const trackingSchema = new mongoose.Schema({
-  sessionId: String,
-  activities: [activitySchema], // Use activitySchema to define the structure of each activity
-  sessionStart: Date,
-  sessionEnd: Date
 });
 
 // Create a model for tracking data
@@ -25,46 +17,23 @@ const Tracking = mongoose.model('Tracking', trackingSchema);
 // POST route to collect tracking data
 router.post('/', async (req, res) => {
   try {
-    const { type, sessionId, buttonName, linkName, count, url, timestamp } = req.body;
+    const { type, buttonName, count, url } = req.body;
 
-    if (type === 'session_end') {
-      // End session and update session end time
-      await Tracking.findOneAndUpdate(
-        { sessionId: sessionId },
-        { $set: { sessionEnd: new Date(timestamp) } },
-        { new: true }
+    if (type === 'button_click') {
+      // Update the existing record if buttonName and URL match
+      const result = await Tracking.findOneAndUpdate(
+        { buttonName: buttonName, url: url },
+        { $inc: { count: count }, timestamp: new Date() },
+        { new: true, upsert: true } // Create new if not exists
       );
+
+      res.status(200).send('Data received');
     } else {
-      const activity = {
-        type: type,
-        url: url,
-        buttonName: buttonName || null,
-        linkName: linkName || null,
-        count: count || 0,
-        timestamp: new Date(timestamp)
-      };
-
-      if (type === 'button_click') {
-        // Find and update or insert the activity
-        await Tracking.findOneAndUpdate(
-          { sessionId: sessionId, 'activities.buttonName': buttonName },
-          { $inc: { 'activities.$.count': count } },
-          { new: true, upsert: true }
-        );
-      } else {
-        // Upsert (update or insert) the document for other activities
-        await Tracking.findOneAndUpdate(
-          { sessionId: sessionId },
-          { 
-            $setOnInsert: { sessionStart: new Date(timestamp) }, // Set session start if document is new
-            $push: { activities: activity } 
-          },
-          { new: true, upsert: true }
-        );
-      }
+      // For other types of data (like pageview)
+      const trackingData = new Tracking(req.body);
+      await trackingData.save();
+      res.status(200).send('Data received');
     }
-
-    res.status(200).send('Data received');
   } catch (error) {
     console.error('Error saving tracking data:', error);
     res.status(500).send('Internal Server Error');
