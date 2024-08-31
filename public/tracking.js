@@ -26,9 +26,8 @@
     timestamp: new Date().toISOString()
   });
 
-  // Track button clicks
+  // Track click events
   const buttonClicks = {};
-
   document.addEventListener('click', function(event) {
     if (event.target.tagName === 'BUTTON') {
       const buttonName = event.target.innerText || event.target.id || 'Unnamed Button';
@@ -49,10 +48,11 @@
     }
 
     // Track navbar link clicks
-    if (event.target.closest('a.nav-link')) {
+    if (event.target.tagName === 'A' && event.target.closest('nav')) {
       const linkName = event.target.innerText || event.target.href || 'Unnamed Link';
+
       sendTrackingData({
-        type: 'navbar_link_click',
+        type: 'link_click',
         sessionId: sessionId,
         linkName: linkName,
         url: window.location.href,
