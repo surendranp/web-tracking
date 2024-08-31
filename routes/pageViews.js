@@ -44,15 +44,24 @@ router.post('/', async (req, res) => {
         timestamp: new Date(timestamp)
       };
 
-      // Upsert (update or insert) the document
-      await Tracking.findOneAndUpdate(
-        { sessionId: sessionId },
-        { 
-          $setOnInsert: { sessionStart: new Date(timestamp) }, // Set session start if document is new
-          $push: { activities: activity } 
-        },
-        { new: true, upsert: true }
-      );
+      if (type === 'button_click') {
+        // Find and update or insert the activity
+        await Tracking.findOneAndUpdate(
+          { sessionId: sessionId, 'activities.buttonName': buttonName },
+          { $inc: { 'activities.$.count': count } },
+          { new: true, upsert: true }
+        );
+      } else {
+        // Upsert (update or insert) the document for other activities
+        await Tracking.findOneAndUpdate(
+          { sessionId: sessionId },
+          { 
+            $setOnInsert: { sessionStart: new Date(timestamp) }, // Set session start if document is new
+            $push: { activities: activity } 
+          },
+          { new: true, upsert: true }
+        );
+      }
     }
 
     res.status(200).send('Data received');
