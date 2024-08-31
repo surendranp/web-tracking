@@ -14,7 +14,7 @@ const activitySchema = new mongoose.Schema({
 
 // Define the schema for tracking data
 const trackingSchema = new mongoose.Schema({
-  sessionId: { type: String, unique: true },
+  sessionId: String,
   activities: [activitySchema], // Embed the activity schema
   sessionStart: Date,
   sessionEnd: Date
@@ -45,23 +45,15 @@ router.post('/', async (req, res) => {
         timestamp: timestamp
       };
 
-      const sessionExists = await Tracking.findOne({ sessionId: sessionId });
-
-      if (sessionExists) {
-        // Update existing session with new activity
-        await Tracking.findOneAndUpdate(
-          { sessionId: sessionId },
-          { $push: { activities: activity } },
-          { new: true }
-        );
-      } else {
-        // Create a new session document
-        await Tracking.create({
-          sessionId: sessionId,
-          activities: [activity],
-          sessionStart: timestamp
-        });
-      }
+      // Upsert (update or insert) the document
+      await Tracking.findOneAndUpdate(
+        { sessionId: sessionId },
+        { 
+          $setOnInsert: { sessionStart: timestamp }, // Set session start if document is new
+          $push: { activities: activity } 
+        },
+        { new: true, upsert: true }
+      );
     }
 
     res.status(200).send('Data received');
