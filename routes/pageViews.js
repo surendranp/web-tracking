@@ -3,11 +3,20 @@ const router = express.Router();
 const mongoose = require('mongoose');
 
 // Define the schema for tracking data
-const trackingSchema = new mongoose.Schema({
+const activitySchema = new mongoose.Schema({
   type: String,
   url: String,
-  element: String,
+  buttonName: { type: String, default: null },
+  linkName: { type: String, default: null },
+  count: { type: Number, default: 0 },
   timestamp: Date
+});
+
+const trackingSchema = new mongoose.Schema({
+  sessionId: String,
+  activities: [activitySchema], // Use activitySchema to define the structure of each activity
+  sessionStart: Date,
+  sessionEnd: Date
 });
 
 // Create a model for tracking data
@@ -16,8 +25,36 @@ const Tracking = mongoose.model('Tracking', trackingSchema);
 // POST route to collect tracking data
 router.post('/', async (req, res) => {
   try {
-    const trackingData = new Tracking(req.body);
-    await trackingData.save();
+    const { type, sessionId, buttonName, linkName, count, url, timestamp } = req.body;
+
+    if (type === 'session_end') {
+      // End session and update session end time
+      await Tracking.findOneAndUpdate(
+        { sessionId: sessionId },
+        { $set: { sessionEnd: new Date(timestamp) } },
+        { new: true }
+      );
+    } else {
+      const activity = {
+        type: type,
+        url: url,
+        buttonName: buttonName || null,
+        linkName: linkName || null,
+        count: count || 0,
+        timestamp: new Date(timestamp)
+      };
+
+      // Upsert (update or insert) the document
+      await Tracking.findOneAndUpdate(
+        { sessionId: sessionId },
+        { 
+          $setOnInsert: { sessionStart: new Date(timestamp) }, // Set session start if document is new
+          $push: { activities: activity } 
+        },
+        { new: true, upsert: true }
+      );
+    }
+
     res.status(200).send('Data received');
   } catch (error) {
     console.error('Error saving tracking data:', error);
