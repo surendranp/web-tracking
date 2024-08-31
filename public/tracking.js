@@ -30,8 +30,11 @@
   const buttonClicks = {};
 
   document.addEventListener('click', function(event) {
-    if (event.target.tagName === 'BUTTON') {
-      const buttonName = event.target.innerText || event.target.id || 'Unnamed Button';
+    const target = event.target;
+
+    // Track button clicks
+    if (target.tagName === 'BUTTON') {
+      const buttonName = target.innerText || target.id || 'Unnamed Button';
 
       if (!buttonClicks[buttonName]) {
         buttonClicks[buttonName] = 0;
@@ -43,6 +46,19 @@
         sessionId: sessionId,
         buttonName: buttonName,
         count: buttonClicks[buttonName],
+        url: window.location.href,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Track navbar link clicks
+    if (target.tagName === 'A' && target.closest('nav')) {
+      const linkName = target.innerText || target.href || 'Unnamed Link';
+
+      sendTrackingData({
+        type: 'navbar_link_click',
+        sessionId: sessionId,
+        linkName: linkName,
         url: window.location.href,
         timestamp: new Date().toISOString()
       });

@@ -8,6 +8,7 @@ const trackingSchema = new mongoose.Schema({
   sessionId: String,
   url: String,
   buttonName: String,
+  linkName: String,
   count: Number,
   timestamp: Date
 });
@@ -18,8 +19,25 @@ const Tracking = mongoose.model('Tracking', trackingSchema);
 // POST route to collect tracking data
 router.post('/', async (req, res) => {
   try {
-    const trackingData = new Tracking(req.body);
-    await trackingData.save();
+    const { type, sessionId, buttonName, linkName, count, url } = req.body;
+
+    if (type === 'button_click') {
+      // Update the existing record if buttonName and URL match
+      await Tracking.findOneAndUpdate(
+        { sessionId: sessionId, buttonName: buttonName, url: url },
+        { $inc: { count: count }, timestamp: new Date() },
+        { new: true, upsert: true } // Create new if not exists
+      );
+    } else if (type === 'navbar_link_click') {
+      // Track navbar link click events
+      const trackingData = new Tracking(req.body);
+      await trackingData.save();
+    } else {
+      // For other types of data (like pageview, session_end)
+      const trackingData = new Tracking(req.body);
+      await trackingData.save();
+    }
+
     res.status(200).send('Data received');
   } catch (error) {
     console.error('Error saving tracking data:', error);
