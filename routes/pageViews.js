@@ -6,12 +6,8 @@ const mongoose = require('mongoose');
 const trackingSchema = new mongoose.Schema({
   type: String,
   url: String,
-  referrer: String,
-  timestamp: Date,
-  userAgent: String,
-  cookies: String,
-  sessionId: String,
-  ipAddress: String
+  element: String,
+  timestamp: Date
 });
 
 // Create a model for tracking data
@@ -20,14 +16,7 @@ const Tracking = mongoose.model('Tracking', trackingSchema);
 // POST route to collect tracking data
 router.post('/', async (req, res) => {
   try {
-    // Get IP address from request headers
-    const ipAddress = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-
-    const trackingData = new Tracking({
-      ...req.body,
-      ipAddress: ipAddress
-    });
-
+    const trackingData = new Tracking(req.body);
     await trackingData.save();
     res.status(200).send('Data received');
   } catch (error) {
