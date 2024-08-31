@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 
-// Define the schema for tracking data
+// Define the schema for each activity
 const activitySchema = new mongoose.Schema({
   type: String,
   url: String,
@@ -12,9 +12,10 @@ const activitySchema = new mongoose.Schema({
   timestamp: Date
 });
 
+// Define the schema for tracking data
 const trackingSchema = new mongoose.Schema({
-  sessionId: String,
-  activities: [activitySchema], // Use activitySchema to define the structure of each activity
+  sessionId: { type: String, unique: true },
+  activities: [activitySchema], // Embed the activity schema
   sessionStart: Date,
   sessionEnd: Date
 });
@@ -27,29 +28,32 @@ router.post('/', async (req, res) => {
   try {
     const { type, sessionId, buttonName, linkName, count, url, timestamp } = req.body;
 
+    const activity = {
+      type: type,
+      url: url,
+      buttonName: buttonName || null,
+      linkName: linkName || null,
+      count: count || null,
+      timestamp: timestamp
+    };
+
     if (type === 'session_end') {
       // End session and update session end time
       await Tracking.findOneAndUpdate(
         { sessionId: sessionId },
-        { $set: { sessionEnd: timestamp } },
+        { $set: { sessionEnd: timestamp, activities: [] } }, // Optionally clear activities on session end
         { new: true }
       );
     } else {
-      const activity = {
-        type: type,
-        url: url,
-        buttonName: buttonName || null,
-        linkName: linkName || null,
-        count: count || null,
-        timestamp: timestamp
-      };
-
-      // Upsert (update or insert) the document
+      // Update or create a new session with the latest activity
       await Tracking.findOneAndUpdate(
         { sessionId: sessionId },
         { 
-          $setOnInsert: { sessionStart: timestamp }, // Set session start if document is new
-          $push: { activities: activity } 
+          $set: {
+            activities: [activity], // Replace existing activities with the new one
+            sessionStart: sessionStart || timestamp
+          },
+          $setOnInsert: { sessionStart: timestamp } // Set session start if document is new
         },
         { new: true, upsert: true }
       );
