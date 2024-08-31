@@ -7,7 +7,9 @@ const trackingSchema = new mongoose.Schema({
   type: String,
   url: String,
   element: String,
-  timestamp: Date
+  timestamp: Date,
+  timeSpent: Number,
+  pageFlow: String
 });
 
 // Create a model for tracking data
