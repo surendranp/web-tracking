@@ -17,9 +17,23 @@ const Tracking = mongoose.model('Tracking', trackingSchema);
 // POST route to collect tracking data
 router.post('/', async (req, res) => {
   try {
-    const trackingData = new Tracking(req.body);
-    await trackingData.save();
-    res.status(200).send('Data received');
+    const { type, buttonName, count, url } = req.body;
+
+    if (type === 'button_click') {
+      // Update the existing record if buttonName and URL match
+      const result = await Tracking.findOneAndUpdate(
+        { buttonName: buttonName, url: url },
+        { $inc: { count: count }, timestamp: new Date() },
+        { new: true, upsert: true } // Create new if not exists
+      );
+
+      res.status(200).send('Data received');
+    } else {
+      // For other types of data (like pageview)
+      const trackingData = new Tracking(req.body);
+      await trackingData.save();
+      res.status(200).send('Data received');
+    }
   } catch (error) {
     console.error('Error saving tracking data:', error);
     res.status(500).send('Internal Server Error');
