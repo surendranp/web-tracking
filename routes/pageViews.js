@@ -11,7 +11,7 @@ const trackingSchema = new mongoose.Schema({
   count: { type: Number, default: 0 },
   timestamp: { type: Date, default: Date.now },
   ip: String,
-  sessionId: String // Ensure this field is not unique if not necessary
+  sessionId: { type: String, index: true } // Ensure this field is indexed but not unique if not necessary
 });
 
 // Create a model for tracking data
@@ -22,17 +22,19 @@ router.post('/', async (req, res) => {
   try {
     const { type, buttonName, count, url, ip, navLinkName, sessionId } = req.body;
 
+    const updateData = { $inc: { count: count }, timestamp: new Date() };
+
     if (type === 'button_click') {
       await Tracking.findOneAndUpdate(
-        { buttonName: buttonName, url: url, ip: ip, sessionId: sessionId },
-        { $inc: { count: count }, timestamp: new Date() },
-        { new: true, upsert: true } // Create new if not exists
+        { buttonName, url, ip, sessionId },
+        updateData,
+        { new: true, upsert: true }
       );
     } else if (type === 'navlink_click') {
       await Tracking.findOneAndUpdate(
-        { navLinkName: navLinkName, url: url, ip: ip, sessionId: sessionId },
-        { $inc: { count: count }, timestamp: new Date() },
-        { new: true, upsert: true } // Create new if not exists
+        { navLinkName, url, ip, sessionId },
+        updateData,
+        { new: true, upsert: true }
       );
     } else {
       // For other types of data (like pageview)

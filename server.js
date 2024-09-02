@@ -16,14 +16,11 @@ app.use(bodyParser.json());
 console.log('MongoDB URI:', process.env.MONGO_URI);
 
 // MongoDB Connection
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
+mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log('MongoDB connected'))
   .catch(err => {
     console.error('MongoDB connection error:', err);
-    process.exit(1); // Exit process if connection fails
+    process.exit(1); // Exit process if unable to connect
   });
 
 // Simple route for health check
@@ -41,12 +38,6 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Serve the dashboard page
 app.get('/dashboard', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/dashboard.html'));
-});
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error('Unhandled Error:', err);
-  res.status(500).send('Something went wrong!');
 });
 
 app.listen(port, () => console.log(`Server running on port ${port}`));
