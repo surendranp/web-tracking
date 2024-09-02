@@ -1,22 +1,19 @@
+// pageViews.js
+
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 
 // Define the schema for tracking data
 const trackingSchema = new mongoose.Schema({
-  ip: { type: String, required: true, unique: true },
-  duration: { type: Number, default: 0 }, // Track total time spent
-  type: String,
-  url: String,
-  navLinks: {
-    type: Map,
-    of: Number // Store navLinkName as key and count as value
-  },
-  buttons: {
-    type: Map,
-    of: Number // Store buttonName as key and count as value
-  },
-  timestamp: { type: Date, default: Date.now }
+  type: { type: String, required: true },
+  url: { type: String, required: true },
+  buttonClicks: { type: Map, of: Number, default: {} },
+  navLinkClicks: { type: Map, of: Number, default: {} },
+  timestamp: { type: Date, default: Date.now },
+  ip: { type: String, required: true },
+  sessionId: String,
+  duration: Number,
 });
 
 // Create a model for tracking data
@@ -25,27 +22,36 @@ const Tracking = mongoose.model('Tracking', trackingSchema);
 // POST route to collect tracking data
 router.post('/', async (req, res) => {
   try {
-    const { type, buttonName, url, ip, navLinkName, duration } = req.body;
+    const { type, buttonName, count, url, ip, navLinkName, sessionId, duration } = req.body;
 
-    // Find or create the tracking document by IP
-    const tracking = await Tracking.findOneAndUpdate(
-      { ip: ip },
-      {
-        $setOnInsert: { ip: ip, type: type, url: url, duration: duration },
-        $set: { timestamp: new Date() }
-      },
-      { new: true, upsert: true }
-    );
+    // Find the document by IP address
+    let trackingData = await Tracking.findOne({ ip: ip });
 
-    if (type === 'button_click' && buttonName) {
-      tracking.buttons.set(buttonName, (tracking.buttons.get(buttonName) || 0) + 1);
+    if (!trackingData) {
+      // If no document exists, create a new one
+      trackingData = new Tracking({
+        type,
+        url,
+        ip,
+        sessionId,
+        duration,
+      });
     }
 
-    if (type === 'navlink_click' && navLinkName) {
-      tracking.navLinks.set(navLinkName, (tracking.navLinks.get(navLinkName) || 0) + 1);
+    if (type === 'button_click') {
+      // Update button click count
+      trackingData.buttonClicks.set(buttonName, (trackingData.buttonClicks.get(buttonName) || 0) + count);
+    } else if (type === 'navlink_click') {
+      // Update navlink click count
+      trackingData.navLinkClicks.set(navLinkName, (trackingData.navLinkClicks.get(navLinkName) || 0) + count);
+    } else if (type === 'pageview') {
+      // Update the URL if it's a pageview
+      trackingData.url = url;
     }
 
-    await tracking.save();
+    // Save the updated tracking data
+    await trackingData.save();
+
     res.status(200).send('Data received');
   } catch (error) {
     console.error('Error saving tracking data:', error.message);
