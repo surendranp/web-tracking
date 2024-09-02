@@ -1,19 +1,17 @@
-// pageViews.js
-
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 
 // Define the schema for tracking data
 const trackingSchema = new mongoose.Schema({
+  ip: { type: String, required: true },
+  duration: Number,
   type: { type: String, required: true },
   url: { type: String, required: true },
-  buttonClicks: { type: Map, of: Number, default: {} },
   navLinkClicks: { type: Map, of: Number, default: {} },
+  buttonClicks: { type: Map, of: Number, default: {} },
   timestamp: { type: Date, default: Date.now },
-  ip: { type: String, required: true },
-  sessionId: String,
-  duration: Number,
+  sessionId: String
 });
 
 // Create a model for tracking data
@@ -22,38 +20,23 @@ const Tracking = mongoose.model('Tracking', trackingSchema);
 // POST route to collect tracking data
 router.post('/', async (req, res) => {
   try {
-    const { type, buttonName, count, url, ip, navLinkName, sessionId, duration } = req.body;
+    const { type, buttonName, navLinkName, url, ip, sessionId } = req.body;
 
-    // Ensure count is a valid number
-    const validCount = parseInt(count, 10) || 0;
-
-    // Find the document by IP address
-    let trackingData = await Tracking.findOne({ ip: ip });
-
-    if (!trackingData) {
-      // If no document exists, create a new one
-      trackingData = new Tracking({
-        type,
-        url,
-        ip,
-        sessionId,
-        duration,
-      });
-    }
-
+    const update = {};
     if (type === 'button_click') {
-      // Update button click count
-      trackingData.buttonClicks.set(buttonName, (trackingData.buttonClicks.get(buttonName) || 0) + validCount);
+      update[`buttonClicks.${buttonName}`] = 1;
     } else if (type === 'navlink_click') {
-      // Update navlink click count
-      trackingData.navLinkClicks.set(navLinkName, (trackingData.navLinkClicks.get(navLinkName) || 0) + validCount);
-    } else if (type === 'pageview') {
-      // Update the URL if it's a pageview
-      trackingData.url = url;
+      update[`navLinkClicks.${navLinkName}`] = 1;
     }
 
-    // Save the updated tracking data
-    await trackingData.save();
+    await Tracking.findOneAndUpdate(
+      { ip: ip, sessionId: sessionId, url: url },
+      {
+        $inc: update,
+        $set: { timestamp: new Date() }
+      },
+      { new: true, upsert: true }
+    );
 
     res.status(200).send('Data received');
   } catch (error) {
