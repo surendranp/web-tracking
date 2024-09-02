@@ -9,7 +9,7 @@
       const data = await response.json();
       return data.ip;
     } catch (error) {
-      console.error('Error fetching IP address:', error);
+      console.error('Error fetching IP address:', error.message);
       return 'unknown';
     }
   }
@@ -22,7 +22,7 @@
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ ...data, ip })
-    }).catch(error => console.error('Error sending tracking data:', error));
+    }).catch(error => console.error('Error sending tracking data:', error.message));
   }
 
   // Track page view

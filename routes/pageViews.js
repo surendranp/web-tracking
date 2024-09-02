@@ -15,6 +15,9 @@ const trackingSchema = new mongoose.Schema({
 // Create a model for tracking data
 const Tracking = mongoose.model('Tracking', trackingSchema);
 
+// Ensure the index is unique for the combination of fields
+Tracking.collection.createIndex({ buttonName: 1, url: 1, ip: 1 }, { unique: true });
+
 // POST route to collect tracking data
 router.post('/', async (req, res) => {
   try {
@@ -36,7 +39,7 @@ router.post('/', async (req, res) => {
       res.status(200).send('Data received');
     }
   } catch (error) {
-    console.error('Error saving tracking data:', error);
+    console.error('Error saving tracking data:', error.message);
     res.status(500).send('Internal Server Error');
   }
 });
@@ -47,7 +50,7 @@ router.get('/', async (req, res) => {
     const data = await Tracking.find();
     res.json(data);
   } catch (error) {
-    console.error('Error fetching tracking data:', error);
+    console.error('Error fetching tracking data:', error.message);
     res.status(500).send('Internal Server Error');
   }
 });
