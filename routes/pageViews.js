@@ -22,6 +22,11 @@ router.post('/', async (req, res) => {
   try {
     const { type, buttonName, navLinkName, url, ip, sessionId } = req.body;
 
+    // Ensure valid data
+    if (!type || !url || !ip || !sessionId) {
+      return res.status(400).send('Missing required fields');
+    }
+
     // Find the document by IP and sessionId
     let trackingData = await Tracking.findOne({ ip, sessionId });
 
