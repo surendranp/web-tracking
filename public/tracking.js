@@ -1,5 +1,5 @@
 (function() {
-  const trackingUrl = 'https://your-domain.com/api/pageviews';
+  const trackingUrl = 'https://your-domain.com/api/pageviews'; // Update with your actual URL
   let sessionId = localStorage.getItem('sessionId') || generateSessionId();
   localStorage.setItem('sessionId', sessionId);
 
@@ -20,13 +20,19 @@
 
   async function sendTrackingData(data) {
     const ip = await getUserIP();
-    fetch(trackingUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ ...data, ip, sessionId })
-    }).catch(error => console.error('Error sending tracking data:', error.message));
+    try {
+      const response = await fetch(trackingUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ ...data, ip, sessionId })
+      });
+      const responseText = await response.text();
+      console.log('Server response:', responseText);
+    } catch (error) {
+      console.error('Error sending tracking data:', error.message);
+    }
   }
 
   // Track page view
