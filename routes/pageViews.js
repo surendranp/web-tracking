@@ -15,9 +15,8 @@ const trackingSchema = new mongoose.Schema({
 // Create a model for tracking data
 const Tracking = mongoose.model('Tracking', trackingSchema);
 
-// Ensure there is no unique index causing conflicts
-// Remove the unique index if it was previously added
-// Tracking.collection.dropIndex('buttonName_1_url_1_ip_1');
+// Remove unnecessary indexes if they exist
+// Tracking.collection.dropIndex('sessionId_1'); // Adjust based on actual index name
 
 // POST route to collect tracking data
 router.post('/', async (req, res) => {
