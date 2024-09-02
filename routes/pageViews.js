@@ -4,12 +4,12 @@ const mongoose = require('mongoose');
 
 // Define the schema for tracking data
 const trackingSchema = new mongoose.Schema({
-  type: String,
-  url: String,
+  type: { type: String, required: true },
+  url: { type: String, required: true },
   buttonName: String,
   count: Number,
-  timestamp: Date,
-  ip: String // Add IP address field
+  timestamp: { type: Date, default: Date.now },
+  ip: String
 });
 
 // Create a model for tracking data
@@ -21,7 +21,7 @@ router.post('/', async (req, res) => {
     const { type, buttonName, count, url, ip } = req.body;
 
     if (type === 'button_click') {
-      // Update the existing record if buttonName, URL, and IP match
+      // Update or create the record
       const result = await Tracking.findOneAndUpdate(
         { buttonName: buttonName, url: url, ip: ip },
         { $inc: { count: count }, timestamp: new Date() },
@@ -31,14 +31,7 @@ router.post('/', async (req, res) => {
       res.status(200).send('Data received');
     } else {
       // For other types of data (like pageview)
-      const trackingData = new Tracking({
-        type,
-        buttonName,
-        count,
-        url,
-        timestamp: new Date(),
-        ip
-      });
+      const trackingData = new Tracking({ type, buttonName, count, url, timestamp: new Date(), ip });
       await trackingData.save();
       res.status(200).send('Data received');
     }
