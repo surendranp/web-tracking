@@ -9,7 +9,8 @@ const trackingSchema = new mongoose.Schema({
   buttonName: String,
   count: { type: Number, default: 0 },
   timestamp: { type: Date, default: Date.now },
-  ip: String
+  ip: String,
+  sessionId: String  // Ensure this field is not unique if not necessary
 });
 
 // Create a model for tracking data
@@ -18,12 +19,12 @@ const Tracking = mongoose.model('Tracking', trackingSchema);
 // POST route to collect tracking data
 router.post('/', async (req, res) => {
   try {
-    const { type, buttonName, count, url, ip } = req.body;
+    const { type, buttonName, count, url, ip, sessionId } = req.body;
 
     if (type === 'button_click') {
       // Update or create the record
       await Tracking.findOneAndUpdate(
-        { buttonName: buttonName, url: url, ip: ip },
+        { buttonName: buttonName, url: url, ip: ip, sessionId: sessionId },
         { $inc: { count: count }, timestamp: new Date() },
         { new: true, upsert: true } // Create new if not exists
       );
@@ -31,7 +32,7 @@ router.post('/', async (req, res) => {
       res.status(200).send('Data received');
     } else {
       // For other types of data (like pageview)
-      const trackingData = new Tracking({ type, buttonName, count, url, timestamp: new Date(), ip });
+      const trackingData = new Tracking({ type, buttonName, count, url, timestamp: new Date(), ip, sessionId });
       await trackingData.save();
       res.status(200).send('Data received');
     }

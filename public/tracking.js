@@ -1,8 +1,6 @@
 (function() {
-  // Replace with your server's endpoint URL
   const trackingUrl = 'https://web-tracking-mongodburi.up.railway.app/api/pageviews';
 
-  // Function to get user's IP address
   async function getUserIP() {
     try {
       const response = await fetch('https://api.ipify.org?format=json');
