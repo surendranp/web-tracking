@@ -46,11 +46,10 @@
       sendTrackingData({
         type: 'button_click',
         buttonName: buttonName,
-        count: buttonClicks[buttonName],
         url: window.location.href,
         timestamp: new Date().toISOString()
       });
-    } else if (event.target.tagName === 'A' && event.target.closest('.navbar')) {
+    } else if (event.target.tagName === 'A') {
       const navLinkName = event.target.innerText || event.target.id || 'Unnamed NavLink';
 
       if (!navClicks[navLinkName]) {
@@ -61,7 +60,6 @@
       sendTrackingData({
         type: 'navlink_click',
         navLinkName: navLinkName,
-        count: navClicks[navLinkName],
         url: window.location.href,
         timestamp: new Date().toISOString()
       });
