@@ -7,7 +7,7 @@ const trackingSchema = new mongoose.Schema({
   type: { type: String, required: true },
   url: { type: String, required: true },
   buttonName: String,
-  count: Number,
+  count: { type: Number, default: 0 },
   timestamp: { type: Date, default: Date.now },
   ip: String
 });
@@ -15,8 +15,9 @@ const trackingSchema = new mongoose.Schema({
 // Create a model for tracking data
 const Tracking = mongoose.model('Tracking', trackingSchema);
 
-// Ensure the index is unique for the combination of fields
-Tracking.collection.createIndex({ buttonName: 1, url: 1, ip: 1 }, { unique: true });
+// Ensure there is no unique index causing conflicts
+// Remove the unique index if it was previously added
+// Tracking.collection.dropIndex('buttonName_1_url_1_ip_1');
 
 // POST route to collect tracking data
 router.post('/', async (req, res) => {
@@ -25,7 +26,7 @@ router.post('/', async (req, res) => {
 
     if (type === 'button_click') {
       // Update or create the record
-      const result = await Tracking.findOneAndUpdate(
+      await Tracking.findOneAndUpdate(
         { buttonName: buttonName, url: url, ip: ip },
         { $inc: { count: count }, timestamp: new Date() },
         { new: true, upsert: true } // Create new if not exists
