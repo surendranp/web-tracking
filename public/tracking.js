@@ -6,7 +6,9 @@
     fetch(trackingUrl, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        // You can include additional headers for the IP address if needed
+        'X-Client-IP': data.ip // Placeholder for IP address
       },
       body: JSON.stringify(data)
     }).catch(error => console.error('Error sending tracking data:', error));
@@ -16,7 +18,8 @@
   sendTrackingData({
     type: 'pageview',
     url: window.location.href,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    ip: 'YOUR_IP_ADDRESS' // Replace with actual IP address logic if available
   });
 
   // Track click events
@@ -36,7 +39,8 @@
         buttonName: buttonName,
         count: buttonClicks[buttonName],
         url: window.location.href,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        ip: 'YOUR_IP_ADDRESS' // Replace with actual IP address logic if available
       });
     }
   });
