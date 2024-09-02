@@ -1,5 +1,7 @@
 (function() {
   const trackingUrl = 'https://your-domain.com/api/pageviews';
+  let sessionId = localStorage.getItem('sessionId') || generateSessionId();
+  localStorage.setItem('sessionId', sessionId);
 
   async function getUserIP() {
     try {
@@ -12,6 +14,10 @@
     }
   }
 
+  function generateSessionId() {
+    return Math.random().toString(36).substr(2, 9);
+  }
+
   async function sendTrackingData(data) {
     const ip = await getUserIP();
     fetch(trackingUrl, {
@@ -19,7 +25,7 @@
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ ...data, ip })
+      body: JSON.stringify({ ...data, ip, sessionId })
     }).catch(error => console.error('Error sending tracking data:', error.message));
   }
 
