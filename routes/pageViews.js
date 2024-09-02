@@ -26,15 +26,15 @@ router.post('/', async (req, res) => {
     const update = {};
 
     if (type === 'button_click' && buttonName) {
-      // Construct the field to be updated in MongoDB
+      // Increment the button click count
       update[`buttonClicks.${buttonName}`] = 1;
     } else if (type === 'navlink_click' && navLinkName) {
-      // Construct the field to be updated in MongoDB
+      // Increment the nav link click count
       update[`navLinkClicks.${navLinkName}`] = 1;
     }
 
-    // Update the database, incrementing the click count and updating the timestamp
-    await Tracking.findOneAndUpdate(
+    // Update the document in MongoDB
+    const result = await Tracking.findOneAndUpdate(
       { ip: ip, sessionId: sessionId, url: url },
       {
         $inc: update,
