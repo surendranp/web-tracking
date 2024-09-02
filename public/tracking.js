@@ -32,6 +32,7 @@
 
   // Track click events
   const buttonClicks = {};
+  const navClicks = {};
 
   document.addEventListener('click', function(event) {
     if (event.target.tagName === 'BUTTON') {
@@ -46,6 +47,21 @@
         type: 'button_click',
         buttonName: buttonName,
         count: buttonClicks[buttonName],
+        url: window.location.href,
+        timestamp: new Date().toISOString()
+      });
+    } else if (event.target.tagName === 'A' && event.target.closest('.navbar')) {
+      const navLinkName = event.target.innerText || event.target.id || 'Unnamed NavLink';
+
+      if (!navClicks[navLinkName]) {
+        navClicks[navLinkName] = 0;
+      }
+      navClicks[navLinkName] += 1;
+
+      sendTrackingData({
+        type: 'navlink_click',
+        navLinkName: navLinkName,
+        count: navClicks[navLinkName],
         url: window.location.href,
         timestamp: new Date().toISOString()
       });
