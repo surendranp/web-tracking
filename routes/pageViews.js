@@ -24,6 +24,9 @@ router.post('/', async (req, res) => {
   try {
     const { type, buttonName, count, url, ip, navLinkName, sessionId, duration } = req.body;
 
+    // Ensure count is a valid number
+    const validCount = parseInt(count, 10) || 0;
+
     // Find the document by IP address
     let trackingData = await Tracking.findOne({ ip: ip });
 
@@ -40,10 +43,10 @@ router.post('/', async (req, res) => {
 
     if (type === 'button_click') {
       // Update button click count
-      trackingData.buttonClicks.set(buttonName, (trackingData.buttonClicks.get(buttonName) || 0) + count);
+      trackingData.buttonClicks.set(buttonName, (trackingData.buttonClicks.get(buttonName) || 0) + validCount);
     } else if (type === 'navlink_click') {
       // Update navlink click count
-      trackingData.navLinkClicks.set(navLinkName, (trackingData.navLinkClicks.get(navLinkName) || 0) + count);
+      trackingData.navLinkClicks.set(navLinkName, (trackingData.navLinkClicks.get(navLinkName) || 0) + validCount);
     } else if (type === 'pageview') {
       // Update the URL if it's a pageview
       trackingData.url = url;
