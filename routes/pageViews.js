@@ -1,28 +1,60 @@
+// pageViews.js
+
 const express = require('express');
 const router = express.Router();
-const Tracking = require('../public/tracking'); // Adjust the path to your model
+const mongoose = require('mongoose');
+
+// Define the schema for tracking data
+const trackingSchema = new mongoose.Schema({
+  type: { type: String, required: true },
+  url: { type: String, required: true },
+  buttonClicks: { type: Map, of: Number, default: {} },
+  navLinkClicks: { type: Map, of: Number, default: {} },
+  timestamp: { type: Date, default: Date.now },
+  ip: { type: String, required: true },
+  sessionId: String,
+  duration: Number,
+});
+
+// Create a model for tracking data
+const Tracking = mongoose.model('Tracking', trackingSchema);
 
 // POST route to collect tracking data
 router.post('/', async (req, res) => {
   try {
-    const { type, buttonName, navLinkName, url, ip, sessionId } = req.body;
+    const { type, buttonName, count, url, ip, navLinkName, sessionId, duration } = req.body;
 
-    // Prepare update object
-    const update = {};
-    if (type === 'button_click' && buttonName) {
-      update[`buttonClicks.${buttonName}`] = (update[`buttonClicks.${buttonName}`] || 0) + 1;
-    } else if (type === 'navlink_click' && navLinkName) {
-      update[`navLinkClicks.${navLinkName}`] = (update[`navLinkClicks.${navLinkName}`] || 0) + 1;
+    // Ensure count is a valid number
+    const validCount = parseInt(count, 10) || 0;
+
+    // Find the document by IP address
+    let trackingData = await Tracking.findOne({ ip: ip });
+
+    if (!trackingData) {
+      // If no document exists, create a new one
+      trackingData = new Tracking({
+        type,
+        url,
+        ip,
+        sessionId,
+        duration,
+      });
     }
 
-    // Find or create the document
-    const result = await Tracking.findOneAndUpdate(
-      { ip, sessionId, url },
-      { $inc: update, $set: { timestamp: new Date() } },
-      { new: true, upsert: true }
-    );
+    if (type === 'button_click') {
+      // Update button click count
+      trackingData.buttonClicks.set(buttonName, (trackingData.buttonClicks.get(buttonName) || 0) + validCount);
+    } else if (type === 'navlink_click') {
+      // Update navlink click count
+      trackingData.navLinkClicks.set(navLinkName, (trackingData.navLinkClicks.get(navLinkName) || 0) + validCount);
+    } else if (type === 'pageview') {
+      // Update the URL if it's a pageview
+      trackingData.url = url;
+    }
 
-    console.log('Data updated:', result);
+    // Save the updated tracking data
+    await trackingData.save();
+
     res.status(200).send('Data received');
   } catch (error) {
     console.error('Error saving tracking data:', error.message);

@@ -1,7 +1,5 @@
 (function() {
-  const trackingUrl = 'https://your-domain.com/api/pageviews'; // Update with your actual URL
-  let sessionId = localStorage.getItem('sessionId') || generateSessionId();
-  localStorage.setItem('sessionId', sessionId);
+  const trackingUrl = 'https://web-tracking-mongodburi.up.railway.app/api/pageviews';
 
   async function getUserIP() {
     try {
@@ -14,25 +12,15 @@
     }
   }
 
-  function generateSessionId() {
-    return Math.random().toString(36).substr(2, 9);
-  }
-
   async function sendTrackingData(data) {
     const ip = await getUserIP();
-    try {
-      const response = await fetch(trackingUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ ...data, ip, sessionId })
-      });
-      const responseText = await response.text();
-      console.log('Server response:', responseText);
-    } catch (error) {
-      console.error('Error sending tracking data:', error.message);
-    }
+    fetch(trackingUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ ...data, ip })
+    }).catch(error => console.error('Error sending tracking data:', error.message));
   }
 
   // Track page view
@@ -43,17 +31,32 @@
   });
 
   // Track click events
+  const buttonClicks = {};
+  const navClicks = {};
+
   document.addEventListener('click', function(event) {
     if (event.target.tagName === 'BUTTON') {
       const buttonName = event.target.innerText || event.target.id || 'Unnamed Button';
+
+      if (!buttonClicks[buttonName]) {
+        buttonClicks[buttonName] = 0;
+      }
+      buttonClicks[buttonName] += 1;
+
       sendTrackingData({
         type: 'button_click',
         buttonName: buttonName,
         url: window.location.href,
         timestamp: new Date().toISOString()
       });
-    } else if (event.target.tagName === 'A' && event.target.closest('.navbar')) {
+    } else if (event.target.tagName === 'A') {
       const navLinkName = event.target.innerText || event.target.id || 'Unnamed NavLink';
+
+      if (!navClicks[navLinkName]) {
+        navClicks[navLinkName] = 0;
+      }
+      navClicks[navLinkName] += 1;
+
       sendTrackingData({
         type: 'navlink_click',
         navLinkName: navLinkName,
