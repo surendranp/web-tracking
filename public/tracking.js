@@ -12,6 +12,10 @@
     }
   }
 
+  function generateSessionId() {
+    return Math.random().toString(36).substr(2, 9);
+  }
+
   async function sendTrackingData(data) {
     const ip = await getUserIP();
     fetch(trackingUrl, {
@@ -23,45 +27,38 @@
     }).catch(error => console.error('Error sending tracking data:', error.message));
   }
 
+  let sessionId = localStorage.getItem('sessionId') || generateSessionId();
+  localStorage.setItem('sessionId', sessionId);
+
   // Track page view
   sendTrackingData({
     type: 'pageview',
     url: window.location.href,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    sessionId
   });
 
   // Track click events
-  const buttonClicks = {};
-  const navClicks = {};
-
   document.addEventListener('click', function(event) {
+    let elementName = 'Unnamed Element';
+
     if (event.target.tagName === 'BUTTON') {
-      const buttonName = event.target.innerText || event.target.id || 'Unnamed Button';
-
-      if (!buttonClicks[buttonName]) {
-        buttonClicks[buttonName] = 0;
-      }
-      buttonClicks[buttonName] += 1;
-
+      elementName = event.target.innerText || event.target.id || 'Unnamed Button';
       sendTrackingData({
         type: 'button_click',
-        buttonName: buttonName,
+        buttonName: elementName,
         url: window.location.href,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        sessionId
       });
     } else if (event.target.tagName === 'A') {
-      const navLinkName = event.target.innerText || event.target.id || 'Unnamed NavLink';
-
-      if (!navClicks[navLinkName]) {
-        navClicks[navLinkName] = 0;
-      }
-      navClicks[navLinkName] += 1;
-
+      elementName = event.target.innerText || event.target.id || 'Unnamed NavLink';
       sendTrackingData({
         type: 'navlink_click',
-        navLinkName: navLinkName,
+        navLinkName: elementName,
         url: window.location.href,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        sessionId
       });
     }
   });

@@ -1,5 +1,3 @@
-// pageViews.js
-
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
@@ -22,13 +20,10 @@ const Tracking = mongoose.model('Tracking', trackingSchema);
 // POST route to collect tracking data
 router.post('/', async (req, res) => {
   try {
-    const { type, buttonName, count, url, ip, navLinkName, sessionId, duration } = req.body;
+    const { type, buttonName, navLinkName, url, ip, sessionId } = req.body;
 
-    // Ensure count is a valid number
-    const validCount = parseInt(count, 10) || 0;
-
-    // Find the document by IP address
-    let trackingData = await Tracking.findOne({ ip: ip });
+    // Find the document by IP and sessionId
+    let trackingData = await Tracking.findOne({ ip, sessionId });
 
     if (!trackingData) {
       // If no document exists, create a new one
@@ -37,18 +32,14 @@ router.post('/', async (req, res) => {
         url,
         ip,
         sessionId,
-        duration,
       });
     }
 
     if (type === 'button_click') {
-      // Update button click count
-      trackingData.buttonClicks.set(buttonName, (trackingData.buttonClicks.get(buttonName) || 0) + validCount);
+      trackingData.buttonClicks.set(buttonName, (trackingData.buttonClicks.get(buttonName) || 0) + 1);
     } else if (type === 'navlink_click') {
-      // Update navlink click count
-      trackingData.navLinkClicks.set(navLinkName, (trackingData.navLinkClicks.get(navLinkName) || 0) + validCount);
+      trackingData.navLinkClicks.set(navLinkName, (trackingData.navLinkClicks.get(navLinkName) || 0) + 1);
     } else if (type === 'pageview') {
-      // Update the URL if it's a pageview
       trackingData.url = url;
     }
 
