@@ -14,7 +14,12 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // Log MongoDB URI for debugging
-console.log('MongoDB URI:', process.env.MONGO_URI);
+const mongoUri = process.env.MONGO_URI;
+if (!mongoUri) {
+  console.error('MongoDB URI is not set.');
+  process.exit(1);
+}
+console.log('MongoDB URI:', mongoUri);
 
 // MongoDB Connection
 mongoose.connect(mongoUri)
