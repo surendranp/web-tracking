@@ -41,9 +41,8 @@
   // Track click events
   document.addEventListener('click', function(event) {
     let elementName = 'Unnamed Element';
-    const tagName = event.target.tagName;
-    
-    if (tagName === 'BUTTON') {
+
+    if (event.target.tagName === 'BUTTON') {
       elementName = event.target.innerText || event.target.id || 'Unnamed Button';
       sendTrackingData({
         type: 'button_click',
@@ -52,21 +51,11 @@
         timestamp: new Date().toISOString(),
         sessionId
       });
-    } else if (tagName === 'A') {
+    } else if (event.target.tagName === 'A') {
       elementName = event.target.innerText || event.target.id || 'Unnamed NavLink';
       sendTrackingData({
         type: 'navlink_click',
         navLinkName: elementName,
-        url: window.location.href,
-        timestamp: new Date().toISOString(),
-        sessionId
-      });
-    } else if (tagName === 'DIV' || tagName === 'SPAN') {
-      // Track other clickable elements if needed
-      elementName = event.target.innerText || event.target.id || 'Unnamed Clickable Element';
-      sendTrackingData({
-        type: 'element_click',
-        elementName: elementName,
         url: window.location.href,
         timestamp: new Date().toISOString(),
         sessionId

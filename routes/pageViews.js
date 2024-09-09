@@ -8,7 +8,6 @@ const trackingSchema = new mongoose.Schema({
   url: { type: String, required: true },
   buttonClicks: { type: Map, of: Number, default: {} },
   navLinkClicks: { type: Map, of: Number, default: {} },
-  elementClicks: { type: Map, of: Number, default: {} },
   timestamp: { type: Date, default: Date.now },
   ip: { type: String, required: true },
   sessionId: String,
@@ -21,7 +20,12 @@ const Tracking = mongoose.model('Tracking', trackingSchema);
 // POST route to collect tracking data
 router.post('/', async (req, res) => {
   try {
-    const { type, buttonName, navLinkName, elementName, url, ip, sessionId } = req.body;
+    const { type, buttonName, navLinkName, url, ip, sessionId } = req.body;
+
+    // Ensure valid data
+    if (!type || !url || !ip || !sessionId) {
+      return res.status(400).send('Missing required fields');
+    }
 
     // Find the document by IP and sessionId
     let trackingData = await Tracking.findOne({ ip, sessionId });
@@ -40,8 +44,6 @@ router.post('/', async (req, res) => {
       trackingData.buttonClicks.set(buttonName, (trackingData.buttonClicks.get(buttonName) || 0) + 1);
     } else if (type === 'navlink_click') {
       trackingData.navLinkClicks.set(navLinkName, (trackingData.navLinkClicks.get(navLinkName) || 0) + 1);
-    } else if (type === 'element_click') {
-      trackingData.elementClicks.set(elementName, (trackingData.elementClicks.get(elementName) || 0) + 1);
     } else if (type === 'pageview') {
       trackingData.url = url;
     }
