@@ -1,5 +1,5 @@
 (function() {
-  const trackingUrl = '/api/pageviews'; // Ensure this is correct for your deployment
+  const trackingUrl = 'https://web-tracking-mongodburi.up.railway.app/api/pageviews';
 
   async function getUserIP() {
     try {
@@ -18,20 +18,13 @@
 
   async function sendTrackingData(data) {
     const ip = await getUserIP();
-    try {
-      const response = await fetch(trackingUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ ...data, ip })
-      });
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
-    } catch (error) {
-      console.error('Error sending tracking data:', error.message);
-    }
+    fetch(trackingUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ ...data, ip })
+    }).catch(error => console.error('Error sending tracking data:', error.message));
   }
 
   let sessionId = localStorage.getItem('sessionId') || generateSessionId();
@@ -49,32 +42,20 @@
   document.addEventListener('click', function(event) {
     let elementName = 'Unnamed Element';
 
-    if (event.target.tagName === 'A' && event.target.closest('nav')) {
-      // Navbar link
-      elementName = event.target.innerText || event.target.id || 'Unnamed NavLink';
+    if (event.target.tagName === 'BUTTON') {
+      elementName = event.target.innerText || event.target.id || 'Unnamed Button';
       sendTrackingData({
-        type: 'navlink_click',
-        navLinkName: elementName,
+        type: 'button_click',
+        buttonName: elementName,
         url: window.location.href,
         timestamp: new Date().toISOString(),
         sessionId
       });
     } else if (event.target.tagName === 'A') {
-      // Other links
-      elementName = event.target.innerText || event.target.id || 'Unnamed Link';
+      elementName = event.target.innerText || event.target.id || 'Unnamed NavLink';
       sendTrackingData({
-        type: 'link_click',
-        linkName: elementName,
-        url: window.location.href,
-        timestamp: new Date().toISOString(),
-        sessionId
-      });
-    } else if (event.target.tagName === 'BUTTON') {
-      // Button clicks
-      elementName = event.target.innerText || event.target.id || 'Unnamed Button';
-      sendTrackingData({
-        type: 'button_click',
-        buttonName: elementName,
+        type: 'navlink_click',
+        navLinkName: elementName,
         url: window.location.href,
         timestamp: new Date().toISOString(),
         sessionId
