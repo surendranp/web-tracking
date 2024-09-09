@@ -42,20 +42,31 @@
   document.addEventListener('click', function(event) {
     let elementName = 'Unnamed Element';
 
-    if (event.target.tagName === 'BUTTON') {
-      elementName = event.target.innerText || event.target.id || 'Unnamed Button';
+    // Check if the clicked element is a navbar link
+    if (event.target.tagName === 'A' && event.target.closest('nav')) {
+      elementName = event.target.innerText || event.target.id || 'Unnamed NavLink';
       sendTrackingData({
-        type: 'button_click',
-        buttonName: elementName,
+        type: 'navlink_click',
+        navLinkName: elementName,
         url: window.location.href,
         timestamp: new Date().toISOString(),
         sessionId
       });
     } else if (event.target.tagName === 'A') {
-      elementName = event.target.innerText || event.target.id || 'Unnamed NavLink';
+      // Other links (non-navbar)
+      elementName = event.target.innerText || event.target.id || 'Unnamed Link';
       sendTrackingData({
-        type: 'navlink_click',
-        navLinkName: elementName,
+        type: 'link_click',
+        linkName: elementName,
+        url: window.location.href,
+        timestamp: new Date().toISOString(),
+        sessionId
+      });
+    } else if (event.target.tagName === 'BUTTON') {
+      elementName = event.target.innerText || event.target.id || 'Unnamed Button';
+      sendTrackingData({
+        type: 'button_click',
+        buttonName: elementName,
         url: window.location.href,
         timestamp: new Date().toISOString(),
         sessionId
