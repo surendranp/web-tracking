@@ -1,5 +1,5 @@
 (function() {
-  const trackingUrl = 'https://your-domain.com/api/pageviews';
+  const trackingUrl = 'https://web-tracking-mongodburi.up.railway.app/api/pageviews';
 
   async function getUserIP() {
     try {
