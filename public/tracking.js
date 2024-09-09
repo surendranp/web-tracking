@@ -1,3 +1,5 @@
+// tracking.js
+
 (function() {
   const trackingUrl = 'https://web-tracking-mongodburi.up.railway.app/api/pageviews';
 
@@ -18,6 +20,7 @@
 
   async function sendTrackingData(data) {
     const ip = await getUserIP();
+    console.log('Sending tracking data:', { ...data, ip });  // For debugging purposes
     fetch(trackingUrl, {
       method: 'POST',
       headers: {

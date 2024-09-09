@@ -1,3 +1,5 @@
+// pageViews.js
+
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
@@ -38,16 +40,20 @@ router.post('/', async (req, res) => {
         ip,
         sessionId,
       });
+    } else {
+      // Update the `url` for pageviews, to reflect the new page
+      if (type === 'pageview') {
+        trackingData.url = url;
+      }
     }
 
+    // Update specific clicks based on the type
     if (type === 'button_click') {
       trackingData.buttonClicks.set(buttonName, (trackingData.buttonClicks.get(buttonName) || 0) + 1);
     } else if (type === 'navlink_click') {
       trackingData.navLinkClicks.set(navLinkName, (trackingData.navLinkClicks.get(navLinkName) || 0) + 1);
     } else if (type === 'link_click') {
       trackingData.links.set(linkName, (trackingData.links.get(linkName) || 0) + 1);
-    } else if (type === 'pageview') {
-      trackingData.url = url;
     }
 
     // Save the updated tracking data
