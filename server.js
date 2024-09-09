@@ -3,7 +3,6 @@ const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
-
 require('dotenv').config();
 
 const app = express();
@@ -22,7 +21,10 @@ if (!mongoUri) {
 console.log('MongoDB URI:', mongoUri);
 
 // MongoDB Connection
-mongoose.connect(mongoUri)
+mongoose.connect(mongoUri, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+})
   .then(() => console.log('MongoDB connected'))
   .catch(err => console.error('MongoDB connection error:', err));
 
