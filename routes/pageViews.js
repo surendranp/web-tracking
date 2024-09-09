@@ -10,12 +10,17 @@ const trackingSchema = new mongoose.Schema({
   navLinkClicks: { type: Map, of: Number, default: {} },
   timestamp: { type: Date, default: Date.now },
   ip: { type: String, required: true },
-  sessionId: { type: String, required: true },
-  duration: { type: Number }
+  sessionId: String,
+  duration: Number,
 });
 
 // Create a model for tracking data
 const Tracking = mongoose.model('Tracking', trackingSchema);
+
+// Function to sanitize keys
+function sanitizeKey(key) {
+  return key.replace(/[.\$]/g, '_');
+}
 
 // POST route to collect tracking data
 router.post('/', async (req, res) => {
@@ -26,6 +31,10 @@ router.post('/', async (req, res) => {
     if (!type || !url || !ip || !sessionId) {
       return res.status(400).send('Missing required fields');
     }
+
+    // Sanitize keys
+    const sanitizedButtonName = sanitizeKey(buttonName || '');
+    const sanitizedNavLinkName = sanitizeKey(navLinkName || '');
 
     // Find the document by IP and sessionId
     let trackingData = await Tracking.findOne({ ip, sessionId });
@@ -41,9 +50,9 @@ router.post('/', async (req, res) => {
     }
 
     if (type === 'button_click') {
-      trackingData.buttonClicks.set(buttonName, (trackingData.buttonClicks.get(buttonName) || 0) + 1);
+      trackingData.buttonClicks.set(sanitizedButtonName, (trackingData.buttonClicks.get(sanitizedButtonName) || 0) + 1);
     } else if (type === 'navlink_click') {
-      trackingData.navLinkClicks.set(navLinkName, (trackingData.navLinkClicks.get(navLinkName) || 0) + 1);
+      trackingData.navLinkClicks.set(sanitizedNavLinkName, (trackingData.navLinkClicks.get(sanitizedNavLinkName) || 0) + 1);
     } else if (type === 'pageview') {
       trackingData.url = url;
     }
