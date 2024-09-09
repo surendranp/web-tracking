@@ -10,8 +10,8 @@ const trackingSchema = new mongoose.Schema({
   navLinkClicks: { type: Map, of: Number, default: {} },
   timestamp: { type: Date, default: Date.now },
   ip: { type: String, required: true },
-  sessionId: String,
-  duration: Number,
+  sessionId: { type: String, required: true },
+  duration: { type: Number }
 });
 
 // Create a model for tracking data
