@@ -52,7 +52,13 @@
 
                     data.items.forEach(item => {
                         const div = document.createElement('div');
-                        div.textContent = `${item.type} - ${item.url} - ${item.timestamp}`;
+                        div.innerHTML = `
+                            <strong>Type:</strong> ${item.type} <br>
+                            <strong>URL:</strong> ${item.url} <br>
+                            <strong>Timestamp:</strong> ${item.timestamp} <br>
+                            <strong>Button Clicks:</strong> ${item.buttonClicks.map(([name, count]) => `${name}: ${count}`).join(', ')} <br>
+                            <strong>Nav Link Clicks:</strong> ${item.navLinkClicks.map(([name, count]) => `${name}: ${count}`).join(', ')} <br><br>
+                        `;
                         container.appendChild(div);
                     });
 

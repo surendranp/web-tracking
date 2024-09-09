@@ -70,17 +70,31 @@ router.get('/', async (req, res) => {
       values: []
     };
 
-    data.forEach(item => {
-      if (item.buttonClicks) {
-        item.buttonClicks.forEach((value, key) => {
-          chartData.labels.push(key);
-          chartData.values.push(value);
+    // Prepare data for displaying
+    const displayData = data.map(item => ({
+      type: item.type,
+      url: item.url,
+      timestamp: item.timestamp,
+      buttonClicks: item.buttonClicks ? Array.from(item.buttonClicks.entries()) : [],
+      navLinkClicks: item.navLinkClicks ? Array.from(item.navLinkClicks.entries()) : []
+    }));
+
+    displayData.forEach(item => {
+      if (item.type === 'button_click') {
+        item.buttonClicks.forEach(([buttonName, count]) => {
+          chartData.labels.push(buttonName);
+          chartData.values.push(count);
+        });
+      } else if (item.type === 'navlink_click') {
+        item.navLinkClicks.forEach(([navLinkName, count]) => {
+          chartData.labels.push(navLinkName);
+          chartData.values.push(count);
         });
       }
     });
 
     res.json({
-      items: data,
+      items: displayData,
       page,
       totalPages,
       chartData
