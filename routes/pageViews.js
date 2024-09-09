@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const mongoose = require('mongoose');
+const Tracking = require('../models/Tracking'); // Adjust the path to your model
 
 // Define the schema for tracking data
 const trackingSchema = new mongoose.Schema({
@@ -40,11 +40,12 @@ router.post('/', async (req, res) => {
       });
     }
 
-    if (type === 'button_click') {
+    // Update the document based on the type of click
+    if (type === 'button_click' && buttonName) {
       trackingData.buttonClicks.set(buttonName, (trackingData.buttonClicks.get(buttonName) || 0) + 1);
-    } else if (type === 'navlink_click') {
+    } else if (type === 'navlink_click' && navLinkName) {
       trackingData.navLinkClicks.set(navLinkName, (trackingData.navLinkClicks.get(navLinkName) || 0) + 1);
-    } else if (type === 'link_click') {
+    } else if (type === 'link_click' && linkName) {
       trackingData.links.set(linkName, (trackingData.links.get(linkName) || 0) + 1);
     } else if (type === 'pageview') {
       trackingData.url = url;

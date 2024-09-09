@@ -1,5 +1,5 @@
 (function() {
-  const trackingUrl = 'https://web-tracking-mongodburi.up.railway.app/api/pageviews';
+  const trackingUrl = '/api/pageviews'; // Ensure this is correct for your deployment
 
   async function getUserIP() {
     try {
@@ -18,13 +18,20 @@
 
   async function sendTrackingData(data) {
     const ip = await getUserIP();
-    fetch(trackingUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ ...data, ip })
-    }).catch(error => console.error('Error sending tracking data:', error.message));
+    try {
+      const response = await fetch(trackingUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ ...data, ip })
+      });
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+    } catch (error) {
+      console.error('Error sending tracking data:', error.message);
+    }
   }
 
   let sessionId = localStorage.getItem('sessionId') || generateSessionId();
@@ -42,8 +49,8 @@
   document.addEventListener('click', function(event) {
     let elementName = 'Unnamed Element';
 
-    // Check if the clicked element is a navbar link
     if (event.target.tagName === 'A' && event.target.closest('nav')) {
+      // Navbar link
       elementName = event.target.innerText || event.target.id || 'Unnamed NavLink';
       sendTrackingData({
         type: 'navlink_click',
@@ -53,7 +60,7 @@
         sessionId
       });
     } else if (event.target.tagName === 'A') {
-      // Other links (non-navbar)
+      // Other links
       elementName = event.target.innerText || event.target.id || 'Unnamed Link';
       sendTrackingData({
         type: 'link_click',
@@ -63,6 +70,7 @@
         sessionId
       });
     } else if (event.target.tagName === 'BUTTON') {
+      // Button clicks
       elementName = event.target.innerText || event.target.id || 'Unnamed Button';
       sendTrackingData({
         type: 'button_click',
