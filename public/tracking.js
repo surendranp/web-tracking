@@ -1,5 +1,5 @@
 (function() {
-  const trackingUrl = 'https://your-deployment-url/api/pageviews';
+  const trackingUrl = 'https://web-tracking-production.up.railway.app/api/pageviews';
 
   async function getUserIP() {
     try {
