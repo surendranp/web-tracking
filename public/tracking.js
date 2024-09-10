@@ -57,7 +57,8 @@
       });
     } else if (event.target.tagName === 'A') {
       elementName = event.target.innerText || event.target.id || 'Unnamed Link';
-      // Track body links
+      
+      // Store in links object for body links
       sendTrackingData({
         type: 'link_click',
         linkName: elementName,
@@ -70,4 +71,5 @@
 
   // Track page navigation (i.e., navigation path)
   window.addEventListener('popstate', trackPageView);
+  window.addEventListener('hashchange', trackPageView); // For hash-based routing
 })();
