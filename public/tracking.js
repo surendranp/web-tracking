@@ -12,78 +12,59 @@
     }
   }
 
-  function generateSessionId() {
-    return Math.random().toString(36).substr(2, 9);
-  }
-
   async function sendTrackingData(data) {
     const ip = await getUserIP();
-    const payload = { ...data, ip };
-
-    console.log('Sending tracking data:', payload);  // Debugging: log the payload
-
     fetch(trackingUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({ ...data, ip })
     }).catch(error => console.error('Error sending tracking data:', error.message));
   }
 
-  let sessionId = localStorage.getItem('sessionId') || generateSessionId();
-  localStorage.setItem('sessionId', sessionId);
-
-  function trackPageView() {
-    sendTrackingData({
-      type: 'pageview',
-      url: window.location.href,
-      timestamp: new Date().toISOString(),
-      sessionId
-    });
-  }
-
-  trackPageView();
-
-  function isMenuClick(element) {
-    return element.closest('nav') || element.classList.contains('menu') || element.classList.contains('navbar');
-  }
-
-  document.addEventListener('click', function(event) {
-    let elementName = 'Unnamed Element';
-
-    if (event.target.tagName === 'BUTTON') {
-      elementName = event.target.innerText || event.target.id || 'Unnamed Button';
-      sendTrackingData({
-        type: 'button_click',
-        buttonName: elementName,
-        url: window.location.href,
-        timestamp: new Date().toISOString(),
-        sessionId
-      });
-    } else if (event.target.tagName === 'A') {
-      elementName = event.target.innerText || event.target.id || 'Unnamed Link';
-
-      if (isMenuClick(event.target)) {
-        sendTrackingData({
-          type: 'menu_click',
-          menuName: elementName,
-          url: window.location.href,
-          timestamp: new Date().toISOString(),
-          sessionId
-        });
-      } else {
-        sendTrackingData({
-          type: 'link_click',
-          linkName: elementName,
-          url: window.location.href,
-          timestamp: new Date().toISOString(),
-          sessionId
-        });
-      }
-    }
+  // Track page view
+  sendTrackingData({
+    type: 'pageview',
+    url: window.location.href,
+    timestamp: new Date().toISOString()
   });
 
-  window.addEventListener('popstate', trackPageView);
-  window.addEventListener('hashchange', trackPageView);
+  // Track click events
+  const buttonClicks = {};
+  const navClicks = {};
+
+  document.addEventListener('click', function(event) {
+    if (event.target.tagName === 'BUTTON') {
+      const buttonName = event.target.innerText || event.target.id || 'Unnamed Button';
+
+      if (!buttonClicks[buttonName]) {
+        buttonClicks[buttonName] = 0;
+      }
+      buttonClicks[buttonName] += 1;
+
+      sendTrackingData({
+        type: 'button_click',
+        buttonName: buttonName,
+        count: buttonClicks[buttonName],
+        url: window.location.href,
+        timestamp: new Date().toISOString()
+      });
+    } else if (event.target.tagName === 'A' && event.target.closest('.navbar')) {
+      const navLinkName = event.target.innerText || event.target.id || 'Unnamed NavLink';
+
+      if (!navClicks[navLinkName]) {
+        navClicks[navLinkName] = 0;
+      }
+      navClicks[navLinkName] += 1;
+
+      sendTrackingData({
+        type: 'navlink_click',
+        navLinkName: navLinkName,
+        count: navClicks[navLinkName],
+        url: window.location.href,
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
 })();
