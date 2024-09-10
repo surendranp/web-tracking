@@ -49,10 +49,9 @@
 
   // Track click events
   document.addEventListener('click', function(event) {
-    let elementName = 'Unnamed Element';
+    let elementName = event.target.innerText.trim() || event.target.id || 'Unnamed Element';
 
     if (event.target.tagName === 'BUTTON') {
-      elementName = event.target.innerText || event.target.id || 'Unnamed Button';
       sendTrackingData({
         type: 'button_click',
         buttonName: elementName,
@@ -61,8 +60,6 @@
         sessionId
       });
     } else if (event.target.tagName === 'A') {
-      elementName = event.target.innerText || event.target.id || 'Unnamed Link';
-
       if (isMenuClick(event.target)) {
         // Store in menus object for navigation links
         sendTrackingData({
