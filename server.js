@@ -13,7 +13,12 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // Log MongoDB URI for debugging
-console.log('MongoDB URI:', process.env.MONGO_URI);
+const mongoUri = process.env.MONGO_URI;
+if (!mongoUri) {
+  console.error('MongoDB URI is not set.');
+  process.exit(1);
+}
+console.log('MongoDB URI:', mongoUri);
 
 // MongoDB Connection
 mongoose.connect(process.env.MONGO_URI)
@@ -27,6 +32,8 @@ mongoose.connect(process.env.MONGO_URI)
 app.get('/', (req, res) => {
   res.send('API is running...');
 });
+// Serve static files from the 'public' directory
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Import and use your routes
 const pageViews = require('./routes/pageViews');
