@@ -8,7 +8,6 @@ const trackingSchema = new mongoose.Schema({
   url: { type: String, required: true },
   buttons: { type: Map, of: Number, default: {} },  // Store button click counts
   links: { type: Map, of: Number, default: {} },    // Store link click counts
-  menus: { type: Map, of: Number, default: {} },    // Store menu/nav click counts
   pageviews: [String],                              // Track navigation flow
   timestamp: { type: Date, default: Date.now },
   ip: { type: String, required: true },
@@ -27,7 +26,7 @@ function sanitizeKey(key) {
 // POST route to collect tracking data
 router.post('/', async (req, res) => {
   try {
-    const { type, buttonName, linkName, menuName, url, ip, sessionId } = req.body;
+    const { type, buttonName, linkName, url, ip, sessionId } = req.body;
 
     if (!type || !url || !ip || !sessionId) {
       return res.status(400).send('Missing required fields');
@@ -60,16 +59,10 @@ router.post('/', async (req, res) => {
       trackingData.buttons.set(sanitizedButtonName, (trackingData.buttons.get(sanitizedButtonName) || 0) + 1);
     }
 
-    // Track link clicks in body
+    // Track link clicks
     if (type === 'link_click') {
       const sanitizedLinkName = sanitizeKey(linkName || '');
       trackingData.links.set(sanitizedLinkName, (trackingData.links.get(sanitizedLinkName) || 0) + 1);
-    }
-
-    // Track menu/nav clicks
-    if (type === 'menu_click') {
-      const sanitizedMenuName = sanitizeKey(menuName || '');
-      trackingData.menus.set(sanitizedMenuName, (trackingData.menus.get(sanitizedMenuName) || 0) + 1);
     }
 
     // Save updated tracking data

@@ -1,5 +1,5 @@
 (function() {
-  const trackingUrl = 'https://web-tracking-production.up.railway.app/api/pageviews';
+  const trackingUrl = 'https://your-deployment-url/api/pageviews';
 
   async function getUserIP() {
     try {
@@ -57,8 +57,6 @@
       });
     } else if (event.target.tagName === 'A') {
       elementName = event.target.innerText || event.target.id || 'Unnamed Link';
-      
-      // Store in links object for body links
       sendTrackingData({
         type: 'link_click',
         linkName: elementName,
