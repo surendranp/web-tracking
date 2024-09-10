@@ -84,7 +84,7 @@ app.post('/api/pageviews', async (req, res) => {
       trackingData.buttons.set(sanitizedButtonName, (trackingData.buttons.get(sanitizedButtonName) || 0) + 1);
     }
 
-    // Track link clicks in body
+    // Track body link clicks
     if (type === 'link_click') {
       const sanitizedLinkName = sanitizeKey(linkName || '');
       trackingData.links.set(sanitizedLinkName, (trackingData.links.get(sanitizedLinkName) || 0) + 1);
@@ -106,16 +106,6 @@ app.post('/api/pageviews', async (req, res) => {
   }
 });
 
-// GET route to retrieve all tracking data
-app.get('/api/pageviews', async (req, res) => {
-  try {
-    const data = await Tracking.find();
-    res.json(data);
-  } catch (error) {
-    console.error('Error fetching tracking data:', error.message);
-    res.status(500).send('Internal Server Error');
-  }
-});
 
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
