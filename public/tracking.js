@@ -44,12 +44,13 @@
 
   // Function to determine if an element is part of the navigation menu
   function isMenuClick(element) {
-    return element.closest('nav') || element.classList.contains('menu') || element.classList.contains('navbar');
+    // Checks if the element or any of its ancestors is a nav or has specific classes
+    return element.closest('nav') || element.closest('.menu') || element.closest('.navbar') || element.closest('.nav') || element.closest('.navbar-nav');
   }
 
   // Track click events
   document.addEventListener('click', function(event) {
-    let elementName = event.target.innerText.trim() || event.target.id || 'Unnamed Element';
+    let elementName = (event.target.innerText || event.target.id || 'Unnamed Element').trim();
 
     if (event.target.tagName === 'BUTTON') {
       sendTrackingData({
