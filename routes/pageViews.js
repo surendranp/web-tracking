@@ -8,6 +8,7 @@ const trackingSchema = new mongoose.Schema({
   url: { type: String, required: true },
   buttons: { type: Map, of: Number, default: {} },  // Store button click counts
   links: { type: Map, of: Number, default: {} },    // Store link click counts
+  menu: { type: Map, of: Number, default: {} }, 
   pageviews: [String],                              // Track navigation flow
   timestamp: { type: Date, default: Date.now },
   ip: { type: String, required: true },
@@ -64,6 +65,11 @@ router.post('/', async (req, res) => {
       const sanitizedLinkName = sanitizeKey(linkName || '');
       trackingData.links.set(sanitizedLinkName, (trackingData.links.get(sanitizedLinkName) || 0) + 1);
     }
+        // button link clicks
+        if (type === 'menu_click') {
+          const sanitizedLinkName = sanitizeKey(linkName || '');
+          trackingData.links.set(sanitizedLinkName, (trackingData.links.get(sanitizedLinkName) || 0) + 1);
+        }
 
     // Save updated tracking data
     await trackingData.save();

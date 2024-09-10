@@ -64,6 +64,21 @@
         timestamp: new Date().toISOString(),
         sessionId
       });
+    }else if (event.target.tagName === 'A' && event.target.closest('.navbar')) {
+      const navLinkName = event.target.innerText || event.target.id || 'Unnamed NavLink';
+
+      if (!navClicks[navLinkName]) {
+        navClicks[navLinkName] = 0;
+      }
+      navClicks[navLinkName] += 1;
+
+      sendTrackingData({
+        type: 'menu_click',
+        navLinkName: navLinkName,
+        count: navClicks[navLinkName],
+        url: window.location.href,
+        timestamp: new Date().toISOString()
+      });
     }
   });
 
