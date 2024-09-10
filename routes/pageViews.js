@@ -37,9 +37,7 @@ router.post('/', async (req, res) => {
     let trackingData = await Tracking.findOne({ ip, sessionId });
 
     if (!trackingData) {
-      // Create a new document if none exists
       trackingData = new Tracking({
-        type,
         url,
         ip,
         sessionId,
@@ -47,32 +45,22 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Update pageviews for navigation flow
     if (type === 'pageview') {
       if (!trackingData.pageviews.includes(url)) {
         trackingData.pageviews.push(url);
       }
-    }
-
-    // Track button clicks
-    if (type === 'button_click') {
+    } else if (type === 'button_click') {
       const sanitizedButtonName = sanitizeKey(buttonName || '');
       trackingData.buttons.set(sanitizedButtonName, (trackingData.buttons.get(sanitizedButtonName) || 0) + 1);
-    }
-
-    // Track link clicks in body
-    if (type === 'link_click') {
+    } else if (type === 'link_click') {
       const sanitizedLinkName = sanitizeKey(linkName || '');
       trackingData.links.set(sanitizedLinkName, (trackingData.links.get(sanitizedLinkName) || 0) + 1);
-    }
-
-    // Track menu/nav clicks
-    if (type === 'menu_click') {
+    } else if (type === 'menu_click') {
       const sanitizedMenuName = sanitizeKey(menuName || '');
       trackingData.menus.set(sanitizedMenuName, (trackingData.menus.get(sanitizedMenuName) || 0) + 1);
     }
 
-    // Save updated tracking data
+    // Save the updated tracking data
     await trackingData.save();
 
     res.status(200).send('Data received');
