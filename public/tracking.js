@@ -18,12 +18,16 @@
 
   async function sendTrackingData(data) {
     const ip = await getUserIP();
+    const payload = { ...data, ip };
+
+    console.log('Sending tracking data:', payload);  // Debugging: log the payload
+
     fetch(trackingUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ ...data, ip })
+      body: JSON.stringify(payload)
     }).catch(error => console.error('Error sending tracking data:', error.message));
   }
 

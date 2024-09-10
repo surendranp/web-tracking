@@ -6,10 +6,10 @@ const mongoose = require('mongoose');
 const trackingSchema = new mongoose.Schema({
   type: { type: String, required: true },
   url: { type: String, required: true },
-  buttons: { type: Map, of: Number, default: {} },  // Store button click counts
-  links: { type: Map, of: Number, default: {} },    // Store link click counts
-  menus: { type: Map, of: Number, default: {} },    // Store menu/nav click counts
-  pageviews: [String],                              // Track navigation flow
+  buttons: { type: Map, of: Number, default: {} },
+  links: { type: Map, of: Number, default: {} },
+  menus: { type: Map, of: Number, default: {} },
+  pageviews: [String],
   timestamp: { type: Date, default: Date.now },
   ip: { type: String, required: true },
   sessionId: String,
@@ -29,6 +29,9 @@ router.post('/', async (req, res) => {
   try {
     const { type, buttonName, linkName, menuName, url, ip, sessionId } = req.body;
 
+    // Log the incoming request body for debugging
+    console.log('Request body:', req.body);
+
     if (!type || !url || !ip || !sessionId) {
       console.error('Missing required fields:', req.body);
       return res.status(400).send('Missing required fields');
@@ -42,7 +45,7 @@ router.post('/', async (req, res) => {
         url,
         ip,
         sessionId,
-        pageviews: [url] // Track the first pageview
+        pageviews: [url]
       });
     }
 
