@@ -13,6 +13,7 @@ const port = process.env.PORT || 5000;
 app.use(cors());
 app.use(bodyParser.json());
 
+// MongoDB URI
 const mongoUri = process.env.MONGO_URI;
 if (!mongoUri) {
   console.error('MongoDB URI is not set.');
