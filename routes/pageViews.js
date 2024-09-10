@@ -6,10 +6,10 @@ const mongoose = require('mongoose');
 const trackingSchema = new mongoose.Schema({
   type: { type: String, required: true },
   url: { type: String, required: true },
-  buttons: { type: Map, of: Number, default: {} },
-  links: { type: Map, of: Number, default: {} },
-  menus: { type: Map, of: Number, default: {} },
-  pageviews: [String], // Array to track navigation flow
+  buttons: { type: Map, of: Number, default: {} },  // Store button click counts
+  links: { type: Map, of: Number, default: {} },    // Store link click counts
+  menus: { type: Map, of: Number, default: {} },    // Store menu/nav click counts
+  pageviews: [String],                              // Track navigation flow
   timestamp: { type: Date, default: Date.now },
   ip: { type: String, required: true },
   sessionId: String,
@@ -47,17 +47,29 @@ router.post('/', async (req, res) => {
       });
     }
 
+    // Update pageviews for navigation flow
+    if (type === 'pageview') {
+      if (!trackingData.pageviews.includes(url)) {
+        trackingData.pageviews.push(url);
+      }
+    }
+
+    // Track button clicks
     if (type === 'button_click') {
       const sanitizedButtonName = sanitizeKey(buttonName || '');
       trackingData.buttons.set(sanitizedButtonName, (trackingData.buttons.get(sanitizedButtonName) || 0) + 1);
-    } else if (type === 'link_click') {
+    }
+
+    // Track link clicks
+    if (type === 'link_click') {
       const sanitizedLinkName = sanitizeKey(linkName || '');
       trackingData.links.set(sanitizedLinkName, (trackingData.links.get(sanitizedLinkName) || 0) + 1);
-    } else if (type === 'menu_click') {
+    }
+
+    // Track menu/nav clicks
+    if (type === 'menu_click') {
       const sanitizedMenuName = sanitizeKey(menuName || '');
       trackingData.menus.set(sanitizedMenuName, (trackingData.menus.get(sanitizedMenuName) || 0) + 1);
-    } else if (type === 'pageview') {
-      trackingData.pageviews.push(url);
     }
 
     // Save updated tracking data

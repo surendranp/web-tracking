@@ -30,7 +30,7 @@
   let sessionId = localStorage.getItem('sessionId') || generateSessionId();
   localStorage.setItem('sessionId', sessionId);
 
-  // Track page view and navigation flow
+  // Track page views and user navigation flow
   function trackPageView() {
     sendTrackingData({
       type: 'pageview',
@@ -49,7 +49,6 @@
 
     if (event.target.tagName === 'BUTTON') {
       elementName = event.target.innerText || event.target.id || 'Unnamed Button';
-      elementType = 'button';
       sendTrackingData({
         type: 'button_click',
         buttonName: elementName,
@@ -60,7 +59,6 @@
     } else if (event.target.tagName === 'A') {
       elementName = event.target.innerText || event.target.id || 'Unnamed Link';
       if (event.target.closest('nav')) {
-        elementType = 'menu';
         sendTrackingData({
           type: 'menu_click',
           menuName: elementName,
@@ -69,7 +67,6 @@
           sessionId
         });
       } else {
-        elementType = 'link';
         sendTrackingData({
           type: 'link_click',
           linkName: elementName,
