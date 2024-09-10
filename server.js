@@ -21,8 +21,8 @@ if (!mongoUri) {
 }
 console.log('MongoDB URI:', mongoUri);
 
-// MongoDB Connection
-mongoose.connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true })
+// MongoDB Connection (no deprecated options)
+mongoose.connect(mongoUri)
   .then(() => console.log('MongoDB connected'))
   .catch(err => console.error('MongoDB connection error:', err));
 
@@ -116,10 +116,7 @@ app.get('/api/pageviews', async (req, res) => {
     res.status(500).send('Internal Server Error');
   }
 });
-// Simple route for health check
-app.get('/', (req, res) => {
-  res.send('API is running...');
-});
+
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 
