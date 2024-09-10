@@ -42,11 +42,16 @@
 
   trackPageView(); // Initial page view tracking
 
-  // Track click events for buttons, links, and navigation/menu items
+  // Function to check if a clicked element is within a navigation menu (including <nav> or menus)
+  function isMenuClick(element) {
+    return element.closest('nav') || element.classList.contains('menu') || element.classList.contains('navbar');
+  }
+
+  // Track click events for buttons, links, and menu items
   document.addEventListener('click', function(event) {
     let elementName = 'Unnamed Element';
-    let elementType = '';
 
+    // Track button clicks
     if (event.target.tagName === 'BUTTON') {
       elementName = event.target.innerText || event.target.id || 'Unnamed Button';
       sendTrackingData({
@@ -56,9 +61,12 @@
         timestamp: new Date().toISOString(),
         sessionId
       });
-    } else if (event.target.tagName === 'A') {
+    }
+    // Track link clicks and menu/navigation clicks
+    else if (event.target.tagName === 'A') {
       elementName = event.target.innerText || event.target.id || 'Unnamed Link';
-      if (event.target.closest('nav')) {
+      
+      if (isMenuClick(event.target)) {
         sendTrackingData({
           type: 'menu_click',
           menuName: elementName,
