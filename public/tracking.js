@@ -40,11 +40,12 @@
     });
   }
 
-  trackPageView(); // Initial page view tracking
+  // Initial page view tracking
+  trackPageView();
 
   // Function to determine if an element is part of the navigation menu
   function isMenuClick(element) {
-    return element.closest('nav') || element.closest('.nav') || element.closest('.navbar');
+    return element.closest('nav') || element.classList.contains('nav') || element.classList.contains('navbar');
   }
 
   // Track click events
@@ -87,4 +88,15 @@
 
   // Track page navigation (i.e., navigation path)
   window.addEventListener('popstate', trackPageView);
+  window.addEventListener('hashchange', trackPageView); // For hash-based routing
+
+  // Track form submissions (optional)
+  document.addEventListener('submit', function(event) {
+    sendTrackingData({
+      type: 'form_submit',
+      url: window.location.href,
+      timestamp: new Date().toISOString(),
+      sessionId
+    });
+  });
 })();
