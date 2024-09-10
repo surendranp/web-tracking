@@ -1,5 +1,7 @@
+
+
 (function() {
-  const trackingUrl = 'https://web-tracking-mongodburi.up.railway.app/api/pageviews';
+  const trackingUrl = 'https://web-tracking-production.up.railway.app/api/pageviews';
 
   async function getUserIP() {
     try {
@@ -10,6 +12,10 @@
       console.error('Error fetching IP address:', error.message);
       return 'unknown';
     }
+  }
+
+  function generateSessionId() {
+    return Math.random().toString(36).substr(2, 9);
   }
 
   async function sendTrackingData(data) {
@@ -23,47 +29,38 @@
     }).catch(error => console.error('Error sending tracking data:', error.message));
   }
 
+  let sessionId = localStorage.getItem('sessionId') || generateSessionId();
+  localStorage.setItem('sessionId', sessionId);
+
   // Track page view
   sendTrackingData({
     type: 'pageview',
     url: window.location.href,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    sessionId
   });
 
   // Track click events
-  const buttonClicks = {};
-  const navClicks = {};
-
   document.addEventListener('click', function(event) {
+    let elementName = 'Unnamed Element';
+
     if (event.target.tagName === 'BUTTON') {
-      const buttonName = event.target.innerText || event.target.id || 'Unnamed Button';
-
-      if (!buttonClicks[buttonName]) {
-        buttonClicks[buttonName] = 0;
-      }
-      buttonClicks[buttonName] += 1;
-
+      elementName = event.target.innerText || event.target.id || 'Unnamed Button';
       sendTrackingData({
         type: 'button_click',
-        buttonName: buttonName,
-        count: buttonClicks[buttonName],
+        buttonName: elementName,
         url: window.location.href,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        sessionId
       });
-    } else if (event.target.tagName === 'A' && event.target.closest('.navbar')) {
-      const navLinkName = event.target.innerText || event.target.id || 'Unnamed NavLink';
-
-      if (!navClicks[navLinkName]) {
-        navClicks[navLinkName] = 0;
-      }
-      navClicks[navLinkName] += 1;
-
+    } else if (event.target.tagName === 'A') {
+      elementName = event.target.innerText || event.target.id || 'Unnamed NavLink';
       sendTrackingData({
         type: 'navlink_click',
-        navLinkName: navLinkName,
-        count: navClicks[navLinkName],
+        navLinkName: elementName,
         url: window.location.href,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        sessionId
       });
     }
   });
