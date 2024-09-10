@@ -1,5 +1,3 @@
-
-
 (function() {
   const trackingUrl = 'https://web-tracking-production.up.railway.app/api/pageviews';
 
