@@ -30,6 +30,7 @@ router.post('/', async (req, res) => {
     const { type, buttonName, linkName, menuName, url, ip, sessionId } = req.body;
 
     if (!type || !url || !ip || !sessionId) {
+      console.error('Missing required fields:', req.body);
       return res.status(400).send('Missing required fields');
     }
 
@@ -58,6 +59,8 @@ router.post('/', async (req, res) => {
     } else if (type === 'menu_click') {
       const sanitizedMenuName = sanitizeKey(menuName || '');
       trackingData.menus.set(sanitizedMenuName, (trackingData.menus.get(sanitizedMenuName) || 0) + 1);
+    } else {
+      console.error('Unknown type:', type);
     }
 
     // Save the updated tracking data

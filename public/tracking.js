@@ -39,14 +39,12 @@
     });
   }
 
-  // Initial page view tracking
   trackPageView();
 
   function isMenuClick(element) {
     return element.closest('nav') || element.classList.contains('menu') || element.classList.contains('navbar');
   }
 
-  // Track click events
   document.addEventListener('click', function(event) {
     let elementName = 'Unnamed Element';
 
@@ -82,7 +80,6 @@
     }
   });
 
-  // Track page navigation (e.g., forward and backward navigation)
   window.addEventListener('popstate', trackPageView);
-  window.addEventListener('hashchange', trackPageView); // For hash-based routing
+  window.addEventListener('hashchange', trackPageView);
 })();
