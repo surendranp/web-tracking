@@ -27,60 +27,39 @@
     }).catch(error => console.error('Error sending tracking data:', error.message));
   }
 
-  // Generate or retrieve session ID
   let sessionId = localStorage.getItem('sessionId') || generateSessionId();
   localStorage.setItem('sessionId', sessionId);
 
   // Track page view
-  async function trackPageView() {
-    await sendTrackingData({
-      type: 'pageview',
-      url: window.location.href,
-      timestamp: new Date().toISOString(),
-      sessionId
-    });
-  }
+  sendTrackingData({
+    type: 'pageview',
+    url: window.location.href,
+    timestamp: new Date().toISOString(),
+    sessionId
+  });
 
-  // Track nav link clicks
-  function trackNavLinkClick(event) {
-    if (event.target.tagName === 'A') {
-      const navLinkName = event.target.innerText || event.target.id || 'Unnamed NavLink';
-      sendTrackingData({
-        type: 'navlink_click',
-        navLinkName: navLinkName,
-        url: window.location.href,
-        timestamp: new Date().toISOString(),
-        sessionId
-      });
-    }
-  }
+  // Track click events
+  document.addEventListener('click', function(event) {
+    let elementName = 'Unnamed Element';
 
-  // Track button clicks
-  function trackButtonClick(event) {
     if (event.target.tagName === 'BUTTON') {
-      const buttonName = event.target.innerText || event.target.id || 'Unnamed Button';
+      elementName = event.target.innerText || event.target.id || 'Unnamed Button';
       sendTrackingData({
         type: 'button_click',
-        buttonName: buttonName,
+        buttonName: elementName,
+        url: window.location.href,
+        timestamp: new Date().toISOString(),
+        sessionId
+      });
+    } else if (event.target.tagName === 'A') {
+      elementName = event.target.innerText || event.target.id || 'Unnamed NavLink';
+      sendTrackingData({
+        type: 'navlink_click',
+        navLinkName: elementName,
         url: window.location.href,
         timestamp: new Date().toISOString(),
         sessionId
       });
     }
-  }
-
-  // Initialize tracking
-  document.addEventListener('DOMContentLoaded', trackPageView);
-  document.addEventListener('click', trackButtonClick);
-  document.addEventListener('click', trackNavLinkClick);
-
-  // Track navigation away from the page
-  window.addEventListener('beforeunload', async () => {
-    await sendTrackingData({
-      type: 'pageview',
-      url: window.location.href,
-      timestamp: new Date().toISOString(),
-      sessionId
-    });
   });
 })();
