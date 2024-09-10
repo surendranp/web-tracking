@@ -26,7 +26,7 @@ mongoose.connect(mongoUri)
   .then(() => console.log('MongoDB connected'))
   .catch(err => console.error('MongoDB connection error:', err));
 
-// Serve static files
+// Serve static files from 'public' directory
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Import and use routes
@@ -35,6 +35,11 @@ app.use('/api/pageviews', pageViews);
 
 // Serve the dashboard page
 app.get('/dashboard', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/dashboard.html'));
+});
+
+// Serve a default page at the root URL (optional)
+app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/dashboard.html'));
 });
 
