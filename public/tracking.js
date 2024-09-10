@@ -30,20 +30,26 @@
   let sessionId = localStorage.getItem('sessionId') || generateSessionId();
   localStorage.setItem('sessionId', sessionId);
 
-  // Track page view
-  sendTrackingData({
-    type: 'pageview',
-    url: window.location.href,
-    timestamp: new Date().toISOString(),
-    sessionId
-  });
+  // Track page view and navigation flow
+  function trackPageView() {
+    sendTrackingData({
+      type: 'pageview',
+      url: window.location.href,
+      timestamp: new Date().toISOString(),
+      sessionId
+    });
+  }
 
-  // Track click events
+  trackPageView(); // Initial page view tracking
+
+  // Track click events for buttons, links, and navigation/menu items
   document.addEventListener('click', function(event) {
     let elementName = 'Unnamed Element';
+    let elementType = '';
 
     if (event.target.tagName === 'BUTTON') {
       elementName = event.target.innerText || event.target.id || 'Unnamed Button';
+      elementType = 'button';
       sendTrackingData({
         type: 'button_click',
         buttonName: elementName,
@@ -52,14 +58,29 @@
         sessionId
       });
     } else if (event.target.tagName === 'A') {
-      elementName = event.target.innerText || event.target.id || 'Unnamed NavLink';
-      sendTrackingData({
-        type: 'navlink_click',
-        navLinkName: elementName,
-        url: window.location.href,
-        timestamp: new Date().toISOString(),
-        sessionId
-      });
+      elementName = event.target.innerText || event.target.id || 'Unnamed Link';
+      if (event.target.closest('nav')) {
+        elementType = 'menu';
+        sendTrackingData({
+          type: 'menu_click',
+          menuName: elementName,
+          url: window.location.href,
+          timestamp: new Date().toISOString(),
+          sessionId
+        });
+      } else {
+        elementType = 'link';
+        sendTrackingData({
+          type: 'link_click',
+          linkName: elementName,
+          url: window.location.href,
+          timestamp: new Date().toISOString(),
+          sessionId
+        });
+      }
     }
   });
+
+  // Monitor page navigation (i.e., navigation path)
+  window.addEventListener('popstate', trackPageView);
 })();
