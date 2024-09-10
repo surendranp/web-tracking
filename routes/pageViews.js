@@ -60,7 +60,7 @@ router.post('/', async (req, res) => {
       trackingData.buttons.set(sanitizedButtonName, (trackingData.buttons.get(sanitizedButtonName) || 0) + 1);
     }
 
-    // Track link clicks
+    // Track link clicks in body
     if (type === 'link_click') {
       const sanitizedLinkName = sanitizeKey(linkName || '');
       trackingData.links.set(sanitizedLinkName, (trackingData.links.get(sanitizedLinkName) || 0) + 1);

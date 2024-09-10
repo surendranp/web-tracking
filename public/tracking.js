@@ -61,12 +61,21 @@
         timestamp: new Date().toISOString(),
         sessionId
       });
+      // Also store in menu if it's navigating
+      sendTrackingData({
+        type: 'menu_click',
+        menuName: elementName,
+        url: window.location.href,
+        timestamp: new Date().toISOString(),
+        sessionId
+      });
     }
     // Track link clicks and menu/navigation clicks
     else if (event.target.tagName === 'A') {
       elementName = event.target.innerText || event.target.id || 'Unnamed Link';
       
       if (isMenuClick(event.target)) {
+        // Store in menu object if the link is part of navigation
         sendTrackingData({
           type: 'menu_click',
           menuName: elementName,
@@ -75,6 +84,7 @@
           sessionId
         });
       } else {
+        // Store in links object for other body links
         sendTrackingData({
           type: 'link_click',
           linkName: elementName,
