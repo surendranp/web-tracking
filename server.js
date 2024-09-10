@@ -32,8 +32,8 @@ const trackingSchema = new mongoose.Schema({
   url: { type: String, required: true },
   buttons: { type: Map, of: Number, default: {} },
   links: { type: Map, of: Number, default: {} },
-  menus: { type: Map, of: Number, default: {} },
-  pageviews: [String],
+  menus: { type: Map, of: Number, default: {} },  // Track clicks on nav-links and nav-tabs
+  pageviews: [String],  // Store navigation flow (URLs)
   timestamp: { type: Date, default: Date.now },
   ip: { type: String, required: true },
   sessionId: String,
@@ -67,20 +67,17 @@ app.post('/api/pageviews', async (req, res) => {
         url,
         ip,
         sessionId,
-        pageviews: [url] // Track the first pageview
+        pageviews: [url]  // Track the first pageview
       });
     }
 
-    // Update pageviews for navigation flow
+    // Track pageviews for navigation flow
     if (type === 'pageview') {
       if (!trackingData.pageviews.includes(url)) {
         trackingData.pageviews.push(url);
       }
     }
-// Simple route for health check
-app.get('/', (req, res) => {
-  res.send('API is running...');
-});
+
     // Track button clicks
     if (type === 'button_click') {
       const sanitizedButtonName = sanitizeKey(buttonName || '');
@@ -93,7 +90,7 @@ app.get('/', (req, res) => {
       trackingData.links.set(sanitizedLinkName, (trackingData.links.get(sanitizedLinkName) || 0) + 1);
     }
 
-    // Track menu/nav clicks
+    // Track nav-link/menu clicks and store click counts in 'menus' object
     if (type === 'menu_click') {
       const sanitizedMenuName = sanitizeKey(menuName || '');
       trackingData.menus.set(sanitizedMenuName, (trackingData.menus.get(sanitizedMenuName) || 0) + 1);
@@ -119,7 +116,10 @@ app.get('/api/pageviews', async (req, res) => {
     res.status(500).send('Internal Server Error');
   }
 });
-
+// Simple route for health check
+app.get('/', (req, res) => {
+  res.send('API is running...');
+});
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 
