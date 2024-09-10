@@ -44,7 +44,7 @@
 
   // Function to determine if an element is part of the navigation menu
   function isMenuClick(element) {
-    return element.closest('nav') || element.classList.contains('menu') || element.classList.contains('navbar');
+    return element.closest('nav') || element.closest('.nav') || element.closest('.navbar');
   }
 
   // Track click events
