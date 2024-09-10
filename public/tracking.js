@@ -30,7 +30,6 @@
   let sessionId = localStorage.getItem('sessionId') || generateSessionId();
   localStorage.setItem('sessionId', sessionId);
 
-  // Track page view
   function trackPageView() {
     sendTrackingData({
       type: 'pageview',
@@ -40,12 +39,8 @@
     });
   }
 
-  trackPageView(); // Initial page view tracking
-
-  // Function to determine if an element is part of the navigation menu
-  function isMenuClick(element) {
-    return element.closest('nav') || element.classList.contains('menu') || element.classList.contains('navbar');
-  }
+  // Track initial page load
+  trackPageView();
 
   // Track click events
   document.addEventListener('click', function(event) {
@@ -64,7 +59,6 @@
       elementName = event.target.innerText || event.target.id || 'Unnamed Link';
 
       if (isMenuClick(event.target)) {
-        // Store in menus object for navigation links
         sendTrackingData({
           type: 'menu_click',
           menuName: elementName,
@@ -73,7 +67,6 @@
           sessionId
         });
       } else {
-        // Store in links object for body links
         sendTrackingData({
           type: 'link_click',
           linkName: elementName,
@@ -87,4 +80,9 @@
 
   // Track page navigation (i.e., navigation path)
   window.addEventListener('popstate', trackPageView);
+
+  // Function to determine if an element is part of the navigation menu
+  function isMenuClick(element) {
+    return element.closest('nav') || element.classList.contains('menu') || element.classList.contains('navbar');
+  }
 })();
