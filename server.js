@@ -12,12 +12,10 @@ const port = process.env.PORT || 5000;
 app.use(cors());
 app.use(bodyParser.json());
 
-// Serve static files from the 'public' directory
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Middleware to dynamically switch database based on domain
+// MongoDB Connections Cache
 const dbConnections = {};
 
+// Middleware to dynamically switch database based on domain
 async function switchDatabase(req, res, next) {
   try {
     const { domainName } = req.body;
@@ -52,7 +50,7 @@ async function switchDatabase(req, res, next) {
 app.use('/api/pageviews', switchDatabase);
 
 // Import and use routes
-const pageViews = require('./routes/pageViews');
+const pageViews = require('./routes/pageviews');
 app.use('/api/pageviews', pageViews);
 
 // Serve the dashboard page
