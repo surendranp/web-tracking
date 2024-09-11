@@ -15,7 +15,7 @@ app.use(bodyParser.json());
 // MongoDB Connections Cache
 const dbConnections = {};
 
-// Middleware to dynamically switch database based on domain
+// Middleware to dynamically switch database based on domain and create collection
 async function switchDatabase(req, res, next) {
   try {
     const { domainName } = req.body;
@@ -24,13 +24,14 @@ async function switchDatabase(req, res, next) {
       return res.status(400).send('Domain name is required');
     }
 
-    const sanitizedDomain = domainName.replace(/\./g, '_');  // Sanitize domain for MongoDB naming
+    // Sanitize the domain name to use as a collection name
+    const sanitizedDomain = domainName.replace(/\./g, '_');
     const dbName = sanitizedDomain; // Use sanitized domain name for the database
-    const mongoUri = `${process.env.MONGODB_BASE_URI}/${dbName}`;  // Construct MongoDB URI
+    const mongoUri = `${process.env.MONGODB_BASE_URI}/${dbName}`;
 
     if (!dbConnections[dbName]) {
       // Create a new connection if it doesn't exist
-      const newConnection = mongoose.createConnection(mongoUri, {
+      const newConnection = await mongoose.createConnection(mongoUri, {
         useNewUrlParser: true,
         useUnifiedTopology: true
       });
@@ -40,6 +41,7 @@ async function switchDatabase(req, res, next) {
 
     // Attach the database connection to the request object
     req.dbConnection = dbConnections[dbName];
+    req.collectionName = sanitizedDomain; // Pass collection name based on the domain
     next();
   } catch (error) {
     console.error('Error in switching database:', error);
@@ -47,7 +49,7 @@ async function switchDatabase(req, res, next) {
   }
 }
 
-app.use('/api/pageviews', switchDatabase);  // Attach middleware to switch databases
+app.use('/api/pageviews', switchDatabase);
 
 // Import and use routes
 const pageViews = require('./routes/pageViews');
