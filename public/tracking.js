@@ -43,12 +43,12 @@
   trackPageView(); // Initial page view tracking
 
   // Track click events
-  document.addEventListener('click', function(event) {
+  document.addEventListener('click', async function(event) {
     let elementName = 'Unnamed Element';
 
     if (event.target.tagName === 'BUTTON') {
       elementName = event.target.innerText || event.target.id || 'Unnamed Button';
-      sendTrackingData({
+      await sendTrackingData({
         type: 'button_click',
         buttonName: elementName,
         url: window.location.href,
@@ -57,7 +57,7 @@
       });
     } else if (event.target.tagName === 'A') {
       elementName = event.target.innerText.trim() || event.target.id || 'Unnamed Link';
-      sendTrackingData({
+      await sendTrackingData({
         type: 'link_click',
         linkName: elementName,
         url: window.location.href,
