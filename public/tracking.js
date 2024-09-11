@@ -56,7 +56,7 @@
         sessionId
       });
     } else if (event.target.tagName === 'A') {
-      elementName = event.target.innerText || event.target.id || 'Unnamed Link';
+      elementName = event.target.innerText.trim() || event.target.id || 'Unnamed Link';
       sendTrackingData({
         type: 'link_click',
         linkName: elementName,
