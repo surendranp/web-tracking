@@ -15,7 +15,7 @@ const trackingSchema = new mongoose.Schema({
   duration: Number,
 });
 
-// Middleware to get the tracking model dynamically
+// Function to get tracking model for the current database connection
 function getTrackingModel(dbConnection) {
   return dbConnection.model('Tracking', trackingSchema);
 }
@@ -24,11 +24,12 @@ function getTrackingModel(dbConnection) {
 router.post('/', async (req, res) => {
   try {
     const { type, buttonName, linkName, url, ip, sessionId } = req.body;
-    const Tracking = getTrackingModel(req.dbConnection);  // Get the correct model for the current DB
 
     if (!type || !url || !ip || !sessionId) {
       return res.status(400).send('Missing required fields');
     }
+
+    const Tracking = getTrackingModel(req.dbConnection);
 
     // Find the document by IP and sessionId
     let trackingData = await Tracking.findOne({ ip, sessionId });
@@ -76,7 +77,7 @@ router.post('/', async (req, res) => {
 // GET route to retrieve all tracking data
 router.get('/', async (req, res) => {
   try {
-    const Tracking = getTrackingModel(req.dbConnection);  // Get the correct model for the current DB
+    const Tracking = getTrackingModel(req.dbConnection);
     const data = await Tracking.find();
     res.json(data);
   } catch (error) {
