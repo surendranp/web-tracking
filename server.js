@@ -31,7 +31,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Dynamically create and use collections based on domain names
 const getCollection = (domain) => {
   const sanitizedDomain = domain.replace(/[.\$]/g, '_'); // Sanitize domain for MongoDB collection name
-  return mongoose.model(sanitizedDomain, new mongoose.Schema({
+  const trackingSchema = new mongoose.Schema({
     type: { type: String, required: true },
     url: { type: String, required: true },
     buttons: { type: Map, of: Number, default: {} },  // Store button click counts
@@ -41,7 +41,8 @@ const getCollection = (domain) => {
     ip: { type: String, required: true },
     sessionId: String,
     duration: Number,
-  }));
+  });
+  return mongoose.model(sanitizedDomain, trackingSchema);
 };
 
 // Route to handle tracking data

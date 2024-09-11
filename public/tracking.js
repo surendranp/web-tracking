@@ -19,13 +19,17 @@
   async function sendTrackingData(data) {
     const ip = await getUserIP();
     const domain = window.location.hostname; // Get the domain name
-    fetch(trackingUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ ...data, ip, domain })
-    }).catch(error => console.error('Error sending tracking data:', error.message));
+    try {
+      await fetch(trackingUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ ...data, ip, domain })
+      });
+    } catch (error) {
+      console.error('Error sending tracking data:', error.message);
+    }
   }
 
   let sessionId = localStorage.getItem('sessionId') || generateSessionId();
