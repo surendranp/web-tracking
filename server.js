@@ -35,19 +35,15 @@ async function switchDatabase(req, res, next) {
         useUnifiedTopology: true
       });
 
-      // Ensure the collection exists by creating a dummy document
-      const dummyModel = newConnection.model('Dummy', new mongoose.Schema({}));
-      await dummyModel.create({ dummy: 'dummy' }).catch(err => {
-        console.log(`Error creating dummy document: ${err}`);
-      });
-
-      dbConnections[sanitizedDomain] = newConnection;
+      // Attach the database connection and collection name to the request object
+      req.dbConnection = newConnection;
+      req.collectionName = sanitizedDomain;
       console.log(`Connected to database: ${sanitizedDomain}`);
+    } else {
+      req.dbConnection = dbConnections[sanitizedDomain];
+      req.collectionName = sanitizedDomain;
     }
 
-    // Attach the database connection and collection name to the request object
-    req.dbConnection = dbConnections[sanitizedDomain];
-    req.collectionName = sanitizedDomain; // Pass collection name based on the domain
     next();
   } catch (error) {
     console.error('Error in switching database:', error);
