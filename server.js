@@ -13,7 +13,7 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // MongoDB URI
-const mongoUri = process.env.MONGO_URI;
+const mongoUri = process.env.MONGODB_URI;
 if (!mongoUri) {
   console.error('MongoDB URI is not set.');
   process.exit(1);
