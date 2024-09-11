@@ -6,30 +6,31 @@ const mongoose = require('mongoose');
 const trackingSchema = new mongoose.Schema({
   type: { type: String, required: true },
   url: { type: String, required: true },
-  buttons: { type: Map, of: Number, default: {} },
-  links: { type: Map, of: Number, default: {} },
-  pageviews: [String],
+  buttons: { type: Map, of: Number, default: {} },  // Store button click counts
+  links: { type: Map, of: Number, default: {} },    // Store link click counts
+  pageviews: [String],                              // Track navigation flow
   timestamp: { type: Date, default: Date.now },
   ip: { type: String, required: true },
   sessionId: String,
   duration: Number,
 });
 
-// Function to get tracking model for the current database connection
-function getTrackingModel(dbConnection) {
-  return dbConnection.model('Tracking', trackingSchema);
+// Create model
+const Tracking = mongoose.model('Tracking', trackingSchema);
+
+// Sanitize keys for safe storage in MongoDB
+function sanitizeKey(key) {
+  return key.replace(/[.\$]/g, '_');
 }
 
 // POST route to collect tracking data
 router.post('/', async (req, res) => {
   try {
-    const { type, buttonName, linkName, url, ip, sessionId, domainName } = req.body;
+    const { type, buttonName, linkName, url, ip, sessionId } = req.body;
 
-    if (!type || !url || !ip || !sessionId || !domainName) {
+    if (!type || !url || !ip || !sessionId) {
       return res.status(400).send('Missing required fields');
     }
-
-    const Tracking = getTrackingModel(req.dbConnection);
 
     // Find the document by IP and sessionId
     let trackingData = await Tracking.findOne({ ip, sessionId });
@@ -54,13 +55,13 @@ router.post('/', async (req, res) => {
 
     // Track button clicks
     if (type === 'button_click') {
-      const sanitizedButtonName = buttonName.replace(/[.\$]/g, '_');
+      const sanitizedButtonName = sanitizeKey(buttonName || '');
       trackingData.buttons.set(sanitizedButtonName, (trackingData.buttons.get(sanitizedButtonName) || 0) + 1);
     }
 
     // Track link clicks
     if (type === 'link_click') {
-      const sanitizedLinkName = linkName.replace(/[.\$]/g, '_');
+      const sanitizedLinkName = sanitizeKey(linkName || '');
       trackingData.links.set(sanitizedLinkName, (trackingData.links.get(sanitizedLinkName) || 0) + 1);
     }
 
@@ -77,7 +78,6 @@ router.post('/', async (req, res) => {
 // GET route to retrieve all tracking data
 router.get('/', async (req, res) => {
   try {
-    const Tracking = getTrackingModel(req.dbConnection);
     const data = await Tracking.find();
     res.json(data);
   } catch (error) {

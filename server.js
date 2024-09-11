@@ -12,45 +12,24 @@ const port = process.env.PORT || 5000;
 app.use(cors());
 app.use(bodyParser.json());
 
-// MongoDB Connections Cache
-const dbConnections = {};
-
-// Middleware to dynamically switch database based on domain
-async function switchDatabase(req, res, next) {
-  try {
-    const { domainName } = req.body;
-
-    if (!domainName) {
-      return res.status(400).send('Domain name is required');
-    }
-
-    const sanitizedDomain = domainName.replace(/\./g, '_');
-    const dbName = sanitizedDomain; // Use sanitized domain name for the database
-    const mongoUri = `${process.env.MONGODB_BASE_URI}/${dbName}`;
-
-    if (!dbConnections[dbName]) {
-      // Create a new connection if it doesn't exist
-      const newConnection = await mongoose.createConnection(mongoUri, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true
-      });
-      dbConnections[dbName] = newConnection;
-      console.log(`Connected to database: ${dbName}`);
-    }
-
-    // Attach the database connection to the request object
-    req.dbConnection = dbConnections[dbName];
-    next();
-  } catch (error) {
-    console.error('Error in switching database:', error);
-    res.status(500).send('Database connection error');
-  }
+// MongoDB URI
+const mongoUri = process.env.MONGODB_URI;
+if (!mongoUri) {
+  console.error('MongoDB URI is not set.');
+  process.exit(1);
 }
+console.log('MongoDB URI:', mongoUri);
 
-app.use('/api/pageviews', switchDatabase);
+// MongoDB Connection
+mongoose.connect(mongoUri)
+  .then(() => console.log('MongoDB connected'))
+  .catch(err => console.error('MongoDB connection error:', err));
+
+// Serve static files
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Import and use routes
-const pageViews = require('./routes/pageviews');
+const pageViews = require('./routes/pageViews');
 app.use('/api/pageviews', pageViews);
 
 // Serve the dashboard page
