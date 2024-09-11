@@ -5,6 +5,7 @@
     try {
       const response = await fetch('https://api.ipify.org?format=json');
       const data = await response.json();
+      console.log('User IP:', data.ip); // Debugging
       return data.ip;
     } catch (error) {
       console.error('Error fetching IP address:', error.message);
@@ -19,6 +20,7 @@
   async function sendTrackingData(data) {
     const ip = await getUserIP();
     const domainName = window.location.hostname;  // Capture the website domain name
+    console.log('Sending tracking data:', { ...data, ip, domainName }); // Debugging
     fetch(trackingUrl, {
       method: 'POST',
       headers: {

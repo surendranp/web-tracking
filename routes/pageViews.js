@@ -23,13 +23,14 @@ function getTrackingModel(dbConnection, collectionName) {
 // POST route to collect tracking data
 router.post('/', async (req, res) => {
   try {
-    const { type, buttonName, linkName, url, ip, sessionId } = req.body;
+    const { type, buttonName, linkName, url, ip, sessionId, domainName } = req.body;
 
-    if (!type || !url || !ip || !sessionId) {
+    if (!type || !url || !ip || !sessionId || !domainName) {
       return res.status(400).send('Missing required fields');
     }
 
-    const Tracking = getTrackingModel(req.dbConnection, req.collectionName);
+    const sanitizedDomain = domainName.replace(/\./g, '_');
+    const Tracking = getTrackingModel(req.dbConnection, sanitizedDomain);
 
     // Find the document by IP and sessionId
     let trackingData = await Tracking.findOne({ ip, sessionId });
