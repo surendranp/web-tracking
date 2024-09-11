@@ -24,13 +24,13 @@ async function switchDatabase(req, res, next) {
       return res.status(400).send('Domain name is required');
     }
 
-    const sanitizedDomain = domainName.replace(/\./g, '_');
+    const sanitizedDomain = domainName.replace(/\./g, '_');  // Sanitize domain for MongoDB naming
     const dbName = sanitizedDomain; // Use sanitized domain name for the database
-    const mongoUri = `${process.env.MONGODB_BASE_URI}/${dbName}`;
+    const mongoUri = `${process.env.MONGODB_BASE_URI}/${dbName}`;  // Construct MongoDB URI
 
     if (!dbConnections[dbName]) {
       // Create a new connection if it doesn't exist
-      const newConnection = await mongoose.createConnection(mongoUri, {
+      const newConnection = mongoose.createConnection(mongoUri, {
         useNewUrlParser: true,
         useUnifiedTopology: true
       });
@@ -47,7 +47,7 @@ async function switchDatabase(req, res, next) {
   }
 }
 
-app.use('/api/pageviews', switchDatabase);
+app.use('/api/pageviews', switchDatabase);  // Attach middleware to switch databases
 
 // Import and use routes
 const pageViews = require('./routes/pageViews');
