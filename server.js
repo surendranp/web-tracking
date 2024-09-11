@@ -51,6 +51,7 @@ app.post('/api/track', async (req, res) => {
     const { domain, type, buttonName, linkName, url, ip, sessionId } = req.body;
 
     if (!domain || !type || !url || !ip || !sessionId) {
+      console.error('Missing required fields:', req.body);
       return res.status(400).send('Missing required fields');
     }
 
