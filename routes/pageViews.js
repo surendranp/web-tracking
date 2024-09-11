@@ -3,37 +3,86 @@ const router = express.Router();
 const mongoose = require('mongoose');
 
 // Define schema for tracking data
-const pageViewSchema = new mongoose.Schema({
-  type: String,
-  url: String,
-  buttonName: String,
-  linkName: String,
-  ip: String,
+const trackingSchema = new mongoose.Schema({
+  type: { type: String, required: true },
+  url: { type: String, required: true },
+  buttons: { type: Map, of: Number, default: {} },  // Store button click counts
+  links: { type: Map, of: Number, default: {} },    // Store link click counts
+  pageviews: [String],                              // Track navigation flow
+  timestamp: { type: Date, default: Date.now },
+  ip: { type: String, required: true },
   sessionId: String,
-  timestamp: Date
+  duration: Number,
 });
 
+// Create model
+const Tracking = mongoose.model('Tracking', trackingSchema);
+
+// Sanitize keys for safe storage in MongoDB
+function sanitizeKey(key) {
+  return key.replace(/[.\$]/g, '_');
+}
+
+// POST route to collect tracking data
 router.post('/', async (req, res) => {
-  const { type, url, buttonName, linkName, ip, sessionId, timestamp } = req.body;
-
-  // Use the domain-based connection
-  const TrackingModel = mongoose.connection.model('Tracking', pageViewSchema);
-
   try {
-    const trackingData = new TrackingModel({
-      type,
-      url,
-      buttonName,
-      linkName,
-      ip,
-      sessionId,
-      timestamp
-    });
+    const { type, buttonName, linkName, url, ip, sessionId } = req.body;
+
+    if (!type || !url || !ip || !sessionId) {
+      return res.status(400).send('Missing required fields');
+    }
+
+    // Find the document by IP and sessionId
+    let trackingData = await Tracking.findOne({ ip, sessionId });
+
+    if (!trackingData) {
+      // Create a new document if none exists
+      trackingData = new Tracking({
+        type,
+        url,
+        ip,
+        sessionId,
+        pageviews: [url] // Track the first pageview
+      });
+    }
+
+    // Update pageviews for navigation flow
+    if (type === 'pageview') {
+      if (!trackingData.pageviews.includes(url)) {
+        trackingData.pageviews.push(url);
+      }
+    }
+
+    // Track button clicks
+    if (type === 'button_click') {
+      const sanitizedButtonName = sanitizeKey(buttonName || '');
+      trackingData.buttons.set(sanitizedButtonName, (trackingData.buttons.get(sanitizedButtonName) || 0) + 1);
+    }
+
+    // Track link clicks
+    if (type === 'link_click') {
+      const sanitizedLinkName = sanitizeKey(linkName || '');
+      trackingData.links.set(sanitizedLinkName, (trackingData.links.get(sanitizedLinkName) || 0) + 1);
+    }
+
+    // Save updated tracking data
     await trackingData.save();
-    res.status(200).send('Tracking data saved successfully');
+
+    res.status(200).send('Data received');
   } catch (error) {
     console.error('Error saving tracking data:', error.message);
-    res.status(500).send('Error saving tracking data');
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+// GET route to retrieve all tracking data
+router.get('/', async (req, res) => {
+  try {
+    const data = await Tracking.find();
+    res.json(data);
+  } catch (error) {
+    console.error('Error fetching tracking data:', error.message);
+    res.status(500).send('Internal Server Error');
   }
 });
 
