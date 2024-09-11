@@ -28,27 +28,32 @@ mongoose.connect(mongoUri)
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Dynamic route handling for tracking data
-app.post('/api/:domain/pageviews', async (req, res) => {
-  const { domain } = req.params;
-  const Tracking = mongoose.model(domain, new mongoose.Schema({
+// Dynamically create and use collections based on domain names
+const getCollection = (domain) => {
+  const sanitizedDomain = domain.replace(/[.\$]/g, '_'); // Sanitize domain for MongoDB collection name
+  return mongoose.model(sanitizedDomain, new mongoose.Schema({
     type: { type: String, required: true },
     url: { type: String, required: true },
-    buttons: { type: Map, of: Number, default: {} },
-    links: { type: Map, of: Number, default: {} },
-    pageviews: [String],
+    buttons: { type: Map, of: Number, default: {} },  // Store button click counts
+    links: { type: Map, of: Number, default: {} },    // Store link click counts
+    pageviews: [String],                              // Track navigation flow
     timestamp: { type: Date, default: Date.now },
     ip: { type: String, required: true },
     sessionId: String,
     duration: Number,
   }));
+};
 
+// Route to handle tracking data
+app.post('/api/track', async (req, res) => {
   try {
-    const { type, buttonName, linkName, url, ip, sessionId } = req.body;
+    const { domain, type, buttonName, linkName, url, ip, sessionId } = req.body;
 
-    if (!type || !url || !ip || !sessionId) {
+    if (!domain || !type || !url || !ip || !sessionId) {
       return res.status(400).send('Missing required fields');
     }
+
+    const Tracking = getCollection(domain);
 
     // Find the document by IP and sessionId
     let trackingData = await Tracking.findOne({ ip, sessionId });
@@ -60,7 +65,7 @@ app.post('/api/:domain/pageviews', async (req, res) => {
         url,
         ip,
         sessionId,
-        pageviews: [url]
+        pageviews: [url] // Track the first pageview
       });
     }
 
@@ -73,13 +78,13 @@ app.post('/api/:domain/pageviews', async (req, res) => {
 
     // Track button clicks
     if (type === 'button_click') {
-      const sanitizedButtonName = sanitizeKey(buttonName || '');
+      const sanitizedButtonName = buttonName.replace(/[.\$]/g, '_');
       trackingData.buttons.set(sanitizedButtonName, (trackingData.buttons.get(sanitizedButtonName) || 0) + 1);
     }
 
     // Track link clicks
     if (type === 'link_click') {
-      const sanitizedLinkName = sanitizeKey(linkName || '');
+      const sanitizedLinkName = linkName.replace(/[.\$]/g, '_');
       trackingData.links.set(sanitizedLinkName, (trackingData.links.get(sanitizedLinkName) || 0) + 1);
     }
 
