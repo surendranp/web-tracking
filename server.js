@@ -28,7 +28,7 @@ mongoose.connect(mongoUri)
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Dynamically create and use collections based on domain names
+// Function to get or create a model based on the domain
 const getCollection = (domain) => {
   const sanitizedDomain = domain.replace(/[.\$]/g, '_'); // Sanitize domain for MongoDB collection name
   const trackingSchema = new mongoose.Schema({
