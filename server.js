@@ -26,21 +26,27 @@ async function switchDatabase(req, res, next) {
 
     // Sanitize the domain name to use as a collection name
     const sanitizedDomain = domainName.replace(/\./g, '_');
-    const dbName = sanitizedDomain; // Use sanitized domain name for the database
-    const mongoUri = `${process.env.MONGODB_BASE_URI}/${dbName}`;
+    const mongoUri = `${process.env.MONGODB_BASE_URI}/${sanitizedDomain}`;
 
-    if (!dbConnections[dbName]) {
+    if (!dbConnections[sanitizedDomain]) {
       // Create a new connection if it doesn't exist
       const newConnection = await mongoose.createConnection(mongoUri, {
         useNewUrlParser: true,
         useUnifiedTopology: true
       });
-      dbConnections[dbName] = newConnection;
-      console.log(`Connected to database: ${dbName}`);
+
+      // Ensure the collection exists by creating a dummy document
+      const dummyModel = newConnection.model('Dummy', new mongoose.Schema({}));
+      await dummyModel.create({ dummy: 'dummy' }).catch(err => {
+        console.log(`Error creating dummy document: ${err}`);
+      });
+
+      dbConnections[sanitizedDomain] = newConnection;
+      console.log(`Connected to database: ${sanitizedDomain}`);
     }
 
-    // Attach the database connection to the request object
-    req.dbConnection = dbConnections[dbName];
+    // Attach the database connection and collection name to the request object
+    req.dbConnection = dbConnections[sanitizedDomain];
     req.collectionName = sanitizedDomain; // Pass collection name based on the domain
     next();
   } catch (error) {
