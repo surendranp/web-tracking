@@ -18,12 +18,13 @@
 
   async function sendTrackingData(data) {
     const ip = await getUserIP();
+    const domainName = window.location.hostname;  // Capture the website domain name
     fetch(trackingUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ ...data, ip })
+      body: JSON.stringify({ ...data, ip, domainName })  // Send domain name
     }).catch(error => console.error('Error sending tracking data:', error.message));
   }
 
