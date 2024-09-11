@@ -1,5 +1,5 @@
 (function() {
-  const trackingUrl = 'https://web-tracking-production.up.railway.app/api/pageviews';  // Replace with your actual API URL
+  const trackingUrl = 'https://web-tracking-production.up.railway.app/api/pageviews';  // Your actual API URL
 
   async function getUserIP() {
     try {
@@ -18,20 +18,18 @@
 
   async function sendTrackingData(data) {
     const ip = await getUserIP();
+    const domainName = window.location.hostname;  // Extract the domain name
     fetch(trackingUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ ...data, ip })
+      body: JSON.stringify({ ...data, ip, domainName })  // Send the domain name to the server
     }).catch(error => console.error('Error sending tracking data:', error.message));
   }
 
   let sessionId = localStorage.getItem('sessionId') || generateSessionId();
   localStorage.setItem('sessionId', sessionId);
-
-  // Extract domain or identifier
-  const siteIdentifier = window.location.hostname;
 
   // Track page view
   function trackPageView() {
@@ -39,39 +37,38 @@
       type: 'pageview',
       url: window.location.href,
       timestamp: new Date().toISOString(),
-      sessionId,
-      siteIdentifier
+      sessionId
     });
   }
 
-  trackPageView(); // Initial page view tracking
+  trackPageView();  // Initial page view tracking
 
   // Track click events
   document.addEventListener('click', function(event) {
     let elementName = 'Unnamed Element';
-    let elementType = '';
 
     if (event.target.tagName === 'BUTTON') {
       elementName = event.target.innerText || event.target.id || 'Unnamed Button';
-      elementType = 'button_click';
-    } else if (event.target.tagName === 'A') {
-      elementName = event.target.innerText || event.target.id || 'Unnamed Link';
-      elementType = 'link_click';
-    }
-
-    if (elementType) {
       sendTrackingData({
-        type: elementType,
-        [elementType === 'button_click' ? 'buttonName' : 'linkName']: elementName,
+        type: 'button_click',
+        buttonName: elementName,
         url: window.location.href,
         timestamp: new Date().toISOString(),
-        sessionId,
-        siteIdentifier
+        sessionId
+      });
+    } else if (event.target.tagName === 'A') {
+      elementName = event.target.innerText || event.target.id || 'Unnamed Link';
+      sendTrackingData({
+        type: 'link_click',
+        linkName: elementName,
+        url: window.location.href,
+        timestamp: new Date().toISOString(),
+        sessionId
       });
     }
   });
 
   // Track page navigation (i.e., navigation path)
   window.addEventListener('popstate', trackPageView);
-  window.addEventListener('hashchange', trackPageView); // For hash-based routing
+  window.addEventListener('hashchange', trackPageView);  // For hash-based routing
 })();
