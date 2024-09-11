@@ -28,9 +28,70 @@ mongoose.connect(mongoUri)
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Import and use routes
-const pageViews = require('./routes/pageViews');
-app.use('/api/pageviews', pageViews);
+// Dynamic route handling for tracking data
+app.post('/api/:domain/pageviews', async (req, res) => {
+  const { domain } = req.params;
+  const Tracking = mongoose.model(domain, new mongoose.Schema({
+    type: { type: String, required: true },
+    url: { type: String, required: true },
+    buttons: { type: Map, of: Number, default: {} },
+    links: { type: Map, of: Number, default: {} },
+    pageviews: [String],
+    timestamp: { type: Date, default: Date.now },
+    ip: { type: String, required: true },
+    sessionId: String,
+    duration: Number,
+  }));
+
+  try {
+    const { type, buttonName, linkName, url, ip, sessionId } = req.body;
+
+    if (!type || !url || !ip || !sessionId) {
+      return res.status(400).send('Missing required fields');
+    }
+
+    // Find the document by IP and sessionId
+    let trackingData = await Tracking.findOne({ ip, sessionId });
+
+    if (!trackingData) {
+      // Create a new document if none exists
+      trackingData = new Tracking({
+        type,
+        url,
+        ip,
+        sessionId,
+        pageviews: [url]
+      });
+    }
+
+    // Update pageviews for navigation flow
+    if (type === 'pageview') {
+      if (!trackingData.pageviews.includes(url)) {
+        trackingData.pageviews.push(url);
+      }
+    }
+
+    // Track button clicks
+    if (type === 'button_click') {
+      const sanitizedButtonName = sanitizeKey(buttonName || '');
+      trackingData.buttons.set(sanitizedButtonName, (trackingData.buttons.get(sanitizedButtonName) || 0) + 1);
+    }
+
+    // Track link clicks
+    if (type === 'link_click') {
+      const sanitizedLinkName = sanitizeKey(linkName || '');
+      trackingData.links.set(sanitizedLinkName, (trackingData.links.get(sanitizedLinkName) || 0) + 1);
+    }
+
+    // Save updated tracking data
+    await trackingData.save();
+
+    res.status(200).send('Data received');
+  } catch (error) {
+    console.error('Error saving tracking data:', error.message);
+    res.status(500).send('Internal Server Error');
+  }
+});
 
 // Serve the dashboard page
 app.get('/dashboard', (req, res) => {

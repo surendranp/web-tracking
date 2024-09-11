@@ -1,5 +1,6 @@
 (function() {
-  const trackingUrl = 'https://web-tracking-production.up.railway.app/api/pageviews';  // Replace with your actual API URL
+  const trackingUrl = 'https://web-tracking-production.up.railway.app/api';  // Adjust the base URL as needed
+  const domain = window.location.hostname.replace(/\./g, '_'); // Sanitize domain name
 
   async function getUserIP() {
     try {
@@ -18,7 +19,7 @@
 
   async function sendTrackingData(data) {
     const ip = await getUserIP();
-    fetch(trackingUrl, {
+    fetch(`${trackingUrl}/${domain}/pageviews`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
