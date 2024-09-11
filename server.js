@@ -8,10 +8,13 @@ require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 5000;
 
+// Middleware
 app.use(cors());
 app.use(bodyParser.json());
 
 // Middleware to dynamically switch to the correct database based on domain
+const connections = {};  // Store connections for different databases
+
 async function switchDatabase(req, res, next) {
   const { domainName } = req.body;
 
@@ -21,19 +24,25 @@ async function switchDatabase(req, res, next) {
 
   const sanitizedDomain = domainName.replace(/\./g, '_');  // Replace dots in the domain name for DB compatibility
   const dbName = sanitizedDomain;  // Use sanitized domain name as the database name
-  const mongoUri = `${process.env.MONGODB_BASE_URI}/${dbName}`;  // Create database for the domain
+  const mongoUri = `${process.env.MONGODB_BASE_URI}/${dbName}`;  // Create unique database name per domain
 
-  try {
-    if (!mongoose.connection.name || mongoose.connection.name !== dbName) {
-      await mongoose.disconnect();
-      await mongoose.connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true });
+  // Check if the connection for this domain already exists
+  if (!connections[dbName]) {
+    try {
+      const newConnection = await mongoose.createConnection(mongoUri, {
+        useNewUrlParser: true,
+        useUnifiedTopology: true
+      });
+      connections[dbName] = newConnection;  // Store connection for reuse
       console.log(`Connected to database: ${dbName}`);
+    } catch (err) {
+      console.error('MongoDB connection error:', err);
+      return res.status(500).send('Failed to connect to database');
     }
-  } catch (err) {
-    console.error('MongoDB connection error:', err);
-    return res.status(500).send('Failed to connect to database');
   }
 
+  // Set the connection to use for this request
+  req.dbConnection = connections[dbName];
   next();
 }
 
