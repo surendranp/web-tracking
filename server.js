@@ -12,10 +12,12 @@ const port = process.env.PORT || 5000;
 app.use(cors());
 app.use(bodyParser.json());
 
-// MongoDB Connections Cache
+// Serve static files from the 'public' directory
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Middleware to dynamically switch database based on domain
 const dbConnections = {};
 
-// Middleware to dynamically switch database based on domain and create collection
 async function switchDatabase(req, res, next) {
   try {
     const { domainName } = req.body;
@@ -24,26 +26,22 @@ async function switchDatabase(req, res, next) {
       return res.status(400).send('Domain name is required');
     }
 
-    // Sanitize the domain name to use as a collection name
     const sanitizedDomain = domainName.replace(/\./g, '_');
-    const mongoUri = `${process.env.MONGODB_BASE_URI}/${sanitizedDomain}`;
+    const dbName = sanitizedDomain; // Use sanitized domain name for the database
+    const mongoUri = `${process.env.MONGODB_BASE_URI}/${dbName}`;
 
-    if (!dbConnections[sanitizedDomain]) {
+    if (!dbConnections[dbName]) {
       // Create a new connection if it doesn't exist
       const newConnection = await mongoose.createConnection(mongoUri, {
         useNewUrlParser: true,
         useUnifiedTopology: true
       });
-
-      // Attach the database connection and collection name to the request object
-      req.dbConnection = newConnection;
-      req.collectionName = sanitizedDomain;
-      console.log(`Connected to database: ${sanitizedDomain}`);
-    } else {
-      req.dbConnection = dbConnections[sanitizedDomain];
-      req.collectionName = sanitizedDomain;
+      dbConnections[dbName] = newConnection;
+      console.log(`Connected to database: ${dbName}`);
     }
 
+    // Attach the database connection to the request object
+    req.dbConnection = dbConnections[dbName];
     next();
   } catch (error) {
     console.error('Error in switching database:', error);
