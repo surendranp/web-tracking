@@ -30,13 +30,17 @@
   let sessionId = localStorage.getItem('sessionId') || generateSessionId();
   localStorage.setItem('sessionId', sessionId);
 
+  // Extract domain or identifier
+  const siteIdentifier = window.location.hostname;
+
   // Track page view
   function trackPageView() {
     sendTrackingData({
       type: 'pageview',
       url: window.location.href,
       timestamp: new Date().toISOString(),
-      sessionId
+      sessionId,
+      siteIdentifier
     });
   }
 
@@ -45,24 +49,24 @@
   // Track click events
   document.addEventListener('click', function(event) {
     let elementName = 'Unnamed Element';
+    let elementType = '';
 
     if (event.target.tagName === 'BUTTON') {
       elementName = event.target.innerText || event.target.id || 'Unnamed Button';
-      sendTrackingData({
-        type: 'button_click',
-        buttonName: elementName,
-        url: window.location.href,
-        timestamp: new Date().toISOString(),
-        sessionId
-      });
+      elementType = 'button_click';
     } else if (event.target.tagName === 'A') {
       elementName = event.target.innerText || event.target.id || 'Unnamed Link';
+      elementType = 'link_click';
+    }
+
+    if (elementType) {
       sendTrackingData({
-        type: 'link_click',
-        linkName: elementName,
+        type: elementType,
+        [elementType === 'button_click' ? 'buttonName' : 'linkName']: elementName,
         url: window.location.href,
         timestamp: new Date().toISOString(),
-        sessionId
+        sessionId,
+        siteIdentifier
       });
     }
   });
