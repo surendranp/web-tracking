@@ -71,7 +71,9 @@ app.get('/tracking-script', (req, res) => {
     <h1>Tracking Script</h1>
     <p>To track your website, add the following script to your website's HTML:</p>
     <p> Paste the below script in your web sites <head> tag <p>
+    <pre>
     <script src="https://web-tracking-mongodburi.up.railway.app/tracking.js"></script>
+    </pre>
   `);
 });
 
