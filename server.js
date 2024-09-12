@@ -94,7 +94,7 @@ app.post('/api/register', async (req, res) => {
 // Email sending cron job (daily report)
 const cron = require('node-cron');
 
-cron.schedule('* * * * *', async () => {
+cron.schedule('0 9 * * *', async () => {
   const registrations = await Registration.find();
 
   registrations.forEach(async registration => {
