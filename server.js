@@ -3,8 +3,8 @@ const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
-require('dotenv').config();
 const nodemailer = require('nodemailer');
+require('dotenv').config();
 
 const app = express();
 const port = process.env.PORT || 8080;
@@ -41,11 +41,12 @@ app.get('/dashboard', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/dashboard.html'));
 });
 
-// Route for client information
+// Client registration route
 app.post('/register', async (req, res) => {
   try {
     const { domain, email } = req.body;
     if (!domain || !email) {
+      console.error('Domain or email is missing:', { domain, email });
       return res.status(400).send('Domain and email are required.');
     }
 
@@ -58,9 +59,11 @@ app.post('/register', async (req, res) => {
     if (!client) {
       client = new Client({ domain, email });
       await client.save();
+      console.log('Client created:', client);
     } else {
       client.email = email;
       await client.save();
+      console.log('Client updated:', client);
     }
 
     const transporter = nodemailer.createTransport({
@@ -80,10 +83,11 @@ app.post('/register', async (req, res) => {
     };
 
     await transporter.sendMail(mailOptions);
+    console.log('Email sent to:', email);
 
     res.status(200).send('Registration successful. Tracking script sent to your email.');
   } catch (error) {
-    console.error('Error registering client:', error.message);
+    console.error('Error registering client:', error.message, error);
     res.status(500).send('Internal Server Error');
   }
 });
