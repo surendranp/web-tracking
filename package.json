@@ -4,6 +4,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "install": "npm install --omit=dev",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
