@@ -8,45 +8,29 @@ require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 5000;
 
+// Middleware
 app.use(cors());
 app.use(bodyParser.json());
 
-// Function to get the MongoDB URI dynamically based on the domain name
-function getMongoDbUriForDomain(domainName) {
-  const sanitizedDomain = domainName.replace(/\./g, '_');  // Sanitize the domain name to make it compatible for database naming
-  const baseUri = process.env.BASE_MONGO_URI;
-  return `${baseUri}/${sanitizedDomain}?retryWrites=true&w=majority`;
+// MongoDB URI
+const mongoUri = process.env.MONGODB_URI;
+if (!mongoUri) {
+  console.error('MongoDB URI is not set.');
+  process.exit(1);
 }
+console.log('MongoDB URI:', mongoUri);
 
-// Middleware to dynamically connect to the correct MongoDB database based on the domain
-app.use(async (req, res, next) => {
-  const domainName = req.body.domainName;
-  
-  if (!domainName) {
-    return res.status(400).send('Domain name is required');
-  }
-  
-  const mongoUri = getMongoDbUriForDomain(domainName);
-  
-  if (!mongoose.connections.some(conn => conn.name === domainName)) {
-    try {
-      await mongoose.connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true });
-      console.log(`Connected to database: ${domainName}`);
-    } catch (err) {
-      console.error('MongoDB connection error:', err);
-      return res.status(500).send('Failed to connect to the database');
-    }
-  }
-  
-  next();
-});
+// MongoDB Connection
+mongoose.connect(mongoUri)
+  .then(() => console.log('MongoDB connected'))
+  .catch(err => console.error('MongoDB connection error:', err));
+
+// Serve static files
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Import and use routes
 const pageViews = require('./routes/pageViews');
 app.use('/api/pageviews', pageViews);
-
-// Serve static files
-app.use(express.static(path.join(__dirname, 'public')));
 
 // Serve the dashboard page
 app.get('/dashboard', (req, res) => {
