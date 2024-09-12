@@ -13,12 +13,13 @@ router.post('/', async (req, res) => {
     const { type, buttonName, linkName, url, ip, sessionId, domain } = req.body;
 
     if (!type || !url || !ip || !sessionId || !domain) {
+      console.error('Error: Missing required fields');
       return res.status(400).send('Missing required fields');
     }
 
     // Create a dynamic collection name based on the domain
     const collectionName = sanitizeKey(domain); // Sanitize the domain name
-    const Tracking = mongoose.model(collectionName, new mongoose.Schema({
+    const trackingSchema = new mongoose.Schema({
       type: { type: String, required: true },
       url: { type: String, required: true },
       buttons: { type: Map, of: Number, default: {} },  // Store button click counts
@@ -28,7 +29,15 @@ router.post('/', async (req, res) => {
       ip: { type: String, required: true },
       sessionId: String,
       duration: Number,
-    }));
+    });
+
+    let Tracking;
+
+    try {
+      Tracking = mongoose.model(collectionName);
+    } catch (error) {
+      Tracking = mongoose.model(collectionName, trackingSchema); // Define model only if it does not already exist
+    }
 
     // Find the document by IP and sessionId
     let trackingData = await Tracking.findOne({ ip, sessionId });
@@ -68,7 +77,7 @@ router.post('/', async (req, res) => {
 
     res.status(200).send('Data received');
   } catch (error) {
-    console.error('Error saving tracking data:', error.message);
+    console.error('Error saving tracking data:', error.message, error);
     res.status(500).send('Internal Server Error');
   }
 });
