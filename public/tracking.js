@@ -72,3 +72,4 @@
   window.addEventListener('popstate', trackPageView);
   window.addEventListener('hashchange', trackPageView); // For hash-based routing
 })();
+ 
