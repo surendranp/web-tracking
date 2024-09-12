@@ -21,11 +21,14 @@ if (!mongoUri) {
 console.log('MongoDB URI:', mongoUri);
 
 // MongoDB Connection
-mongoose.connect(mongoUri)
+mongoose.connect(mongoUri, { 
+  useNewUrlParser: true,
+  useUnifiedTopology: true 
+})
   .then(() => console.log('MongoDB connected'))
   .catch(err => {
     console.error('MongoDB connection error:', err);
-    process.exit(1); // Exit process on connection error
+    process.exit(1);
   });
 
 // Serve static files
@@ -40,5 +43,4 @@ app.get('/dashboard', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/dashboard.html'));
 });
 
-// Start server
 app.listen(port, () => console.log(`Server running on port ${port}`));
