@@ -16,22 +16,21 @@ const trackingSchema = new mongoose.Schema({
 });
 
 // Create model
-const createTrackingModel = (siteIdentifier) => {
-  const schema = trackingSchema.clone();
-  return mongoose.model(`Tracking_${siteIdentifier}`, schema, `tracking_${siteIdentifier}`);
-};
+const Tracking = mongoose.model('Tracking', trackingSchema);
+
+// Sanitize keys for safe storage in MongoDB
+function sanitizeKey(key) {
+  return key.replace(/[.\$]/g, '_');
+}
 
 // POST route to collect tracking data
 router.post('/', async (req, res) => {
   try {
-    const { type, buttonName, linkName, url, ip, sessionId, siteIdentifier } = req.body;
+    const { type, buttonName, linkName, url, ip, sessionId } = req.body;
 
-    if (!type || !url || !ip || !sessionId || !siteIdentifier) {
+    if (!type || !url || !ip || !sessionId) {
       return res.status(400).send('Missing required fields');
     }
-
-    // Dynamically create or use existing model based on siteIdentifier
-    const Tracking = createTrackingModel(siteIdentifier);
 
     // Find the document by IP and sessionId
     let trackingData = await Tracking.findOne({ ip, sessionId });
@@ -79,12 +78,6 @@ router.post('/', async (req, res) => {
 // GET route to retrieve all tracking data
 router.get('/', async (req, res) => {
   try {
-    // You may want to query a specific database based on siteIdentifier
-    const siteIdentifier = req.query.siteIdentifier;
-    if (!siteIdentifier) {
-      return res.status(400).send('Site identifier is required');
-    }
-    const Tracking = createTrackingModel(siteIdentifier);
     const data = await Tracking.find();
     res.json(data);
   } catch (error) {
