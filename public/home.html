@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Client Registration</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 600px; margin: auto; }
+        label { display: block; margin-bottom: 10px; }
+        input { width: 100%; padding: 8px; margin-bottom: 20px; }
+        button { padding: 10px 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Register Your Domain</h1>
+        <form id="registrationForm">
+            <label for="domain">Domain:</label>
+            <input type="text" id="domain" name="domain" required>
+            <label for="email">Email Address:</label>
+            <input type="email" id="email" name="email" required>
+            <button type="submit">Submit</button>
+        </form>
+        <div id="scriptDisplay" style="display: none;">
+            <h2>Script to Add to Your Website:</h2>
+            <p>Include the following script in the `<head>` section of your website:</p>
+            <pre><code>&lt;script src="https://web-tracking-mongodburi.up.railway.app/tracking.js"&gt;&lt;/script&gt;</code></pre>
+        </div>
+    </div>
+    <script>
+        document.getElementById('registrationForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const domain = document.getElementById('domain').value;
+            const email = document.getElementById('email').value;
+
+            const response = await fetch('/api/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ domain, email })
+            });
+
+            if (response.ok) {
+                document.getElementById('registrationForm').style.display = 'none';
+                document.getElementById('scriptDisplay').style.display = 'block';
+            } else {
+                alert('Error registering domain. Please try again.');
+            }
+        });
+    </script>
+</body>
+</html>
