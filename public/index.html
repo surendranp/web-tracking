@@ -1,35 +1,13 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Register for Tracking</title>
-  <script>
-    async function register() {
-      const domain = document.getElementById('domain').value;
-      const email = document.getElementById('email').value;
-
-      if (!domain || !email) {
-        alert('Please enter both domain and email.');
-        return;
-      }
-
-      try {
-        const response = await fetch('/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ domain, email })
-        });
-        const message = await response.text();
-        alert(message);
-      } catch (error) {
-        console.error('Error:', error);
-        alert('An error occurred.');
-      }
-    }
-  </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tracking Service Registration</title>
 </head>
 <body>
-  <h1>Register for Tracking</h1>
-  <form onsubmit="event.preventDefault(); register();">
+  <h1>Welcome to the Tracking Service</h1>
+  <form id="client-form">
     <label for="domain">Domain:</label>
     <input type="text" id="domain" name="domain" required>
     <br>
@@ -38,5 +16,33 @@
     <br>
     <button type="submit">Register</button>
   </form>
+
+  <script>
+    document.getElementById('client-form').addEventListener('submit', async function(event) {
+      event.preventDefault();
+      const domain = document.getElementById('domain').value;
+      const email = document.getElementById('email').value;
+
+      try {
+        const response = await fetch('/register', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ domain, email })
+        });
+
+        if (response.ok) {
+          alert('Registration successful! Please check your email for the tracking script.');
+          window.location.href = '/tracking-script';
+        } else {
+          alert('Error registering client.');
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        alert('An error occurred.');
+      }
+    });
+  </script>
 </body>
 </html>
