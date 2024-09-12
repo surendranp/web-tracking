@@ -1,5 +1,5 @@
 (function() {
-  const trackingUrl = 'https://web-tracking-production.up.railway.app/api/track';  // Replace with your actual API URL
+  const trackingUrl = 'https://web-tracking-production.up.railway.app/api/pageviews';  // Your actual API URL
 
   async function getUserIP() {
     try {
@@ -18,18 +18,14 @@
 
   async function sendTrackingData(data) {
     const ip = await getUserIP();
-    const domain = window.location.hostname; // Get the domain name
-    try {
-      await fetch(trackingUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ ...data, ip, domain })
-      });
-    } catch (error) {
-      console.error('Error sending tracking data:', error.message);
-    }
+    const domainName = window.location.hostname;  // Extract the domain name
+    fetch(trackingUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ ...data, ip, domainName })  // Send the domain name to the server
+    }).catch(error => console.error('Error sending tracking data:', error.message));
   }
 
   let sessionId = localStorage.getItem('sessionId') || generateSessionId();
@@ -45,7 +41,7 @@
     });
   }
 
-  trackPageView(); // Initial page view tracking
+  trackPageView();  // Initial page view tracking
 
   // Track click events
   document.addEventListener('click', function(event) {
@@ -74,5 +70,5 @@
 
   // Track page navigation (i.e., navigation path)
   window.addEventListener('popstate', trackPageView);
-  window.addEventListener('hashchange', trackPageView); // For hash-based routing
+  window.addEventListener('hashchange', trackPageView);  // For hash-based routing
 })();
