@@ -4,7 +4,7 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
 const nodemailer = require('nodemailer');
-const cron = require('node-cron');
+const schedule = require('node-schedule'); // For scheduling emails
 require('dotenv').config();
 
 const app = express();
@@ -13,6 +13,7 @@ const port = process.env.PORT || 8080;
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true })); // For handling form submissions
 
 // MongoDB URI
 const mongoUri = process.env.MONGODB_URI;
@@ -30,60 +31,30 @@ mongoose.connect(mongoUri)
     process.exit(1);
   });
 
-// Define Schema and Model for Client Info
+// Define schemas and models
 const clientSchema = new mongoose.Schema({
-  domain: String,
-  email: String
+  domain: { type: String, required: true },
+  email: { type: String, required: true },
 });
-const Client = mongoose.model('Client', clientSchema);
 
-// Define Schema and Model for Tracking Data
-const trackingSchema = new mongoose.Schema({
-  type: { type: String, required: true },
-  url: { type: String, required: true },
-  buttons: { type: Map, of: Number, default: {} },
-  links: { type: Map, of: Number, default: {} },
-  pageviews: [String],
-  timestamp: { type: Date, default: Date.now },
-  ip: { type: String, required: true },
-  sessionId: String,
-  duration: Number,
-});
-const Tracking = mongoose.model('Tracking', trackingSchema);
+const Client = mongoose.model('Client', clientSchema);
 
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Import and use routes
-const pageViews = require('./routes/pageViews');
-app.use('/api/pageviews', pageViews);
-
-// Serve the dashboard page
-app.get('/dashboard', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/dashboard.html'));
-});
-
-// Route to handle client domain and email input
-app.post('/register', async (req, res) => {
-  const { domain, email } = req.body;
-  if (!domain || !email) {
-    return res.status(400).send('Domain and email are required.');
-  }
-
-  try {
-    const newClient = new Client({ domain, email });
-    await newClient.save();
-    res.status(200).send('Client registered successfully.');
-  } catch (error) {
-    console.error('Error registering client:', error.message);
-    res.status(500).send('Internal Server Error');
-  }
-});
-
-// Route to get the tracking script and instructions
-app.get('/tracking-script', (req, res) => {
+// Serve the homepage
+app.get('/', (req, res) => {
   res.send(`
-    <h1>Tracking Script</h1>
+    <h1>Welcome to the Tracking Service</h1>
+    <p>Please enter your domain and email address below:</p>
+    <form action="/register" method="post">
+      <label for="domain">Domain:</label>
+      <input type="text" id="domain" name="domain" required><br><br>
+      <label for="email">Email:</label>
+      <input type="email" id="email" name="email" required><br><br>
+      <input type="submit" value="Register">
+    </form>
+    <h2>Tracking Script</h2>
     <p>To track your website, add the following script to your website's HTML:</p>
     <pre>
 <script src="https://web-tracking-mongodburi.up.railway.app/tracking.js"></script>
@@ -91,45 +62,75 @@ app.get('/tracking-script', (req, res) => {
   `);
 });
 
-// Set up Nodemailer for sending emails
-const transporter = nodemailer.createTransport({
-  service: 'Gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
+// Register route
+app.post('/register', async (req, res) => {
+  try {
+    const { domain, email } = req.body;
+
+    if (!domain || !email) {
+      return res.status(400).send('Missing required fields');
+    }
+
+    // Save client information
+    const client = new Client({ domain, email });
+    await client.save();
+
+    res.send('Registration successful');
+  } catch (error) {
+    console.error('Error registering client:', error);
+    res.status(500).send('Internal Server Error');
   }
 });
 
-// Function to send tracking details to clients
-async function sendTrackingReports() {
+// Function to send emails
+async function sendEmail(clientEmail, subject, html) {
+  const transporter = nodemailer.createTransport({
+    service: 'gmail', // Use your email provider
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
+
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: clientEmail,
+    subject: subject,
+    html: html,
+  };
+
+  return transporter.sendMail(mailOptions);
+}
+
+// Function to generate and send daily reports
+async function sendDailyReports() {
   try {
     const clients = await Client.find();
+
     for (const client of clients) {
-      const { domain, email } = client;
+      // Generate the report for this client
+      // This is where you would generate the report based on their domain data
 
-      // Get tracking data for the client's domain
-      const trackingData = await Tracking.find({ domain });
+      // Example HTML content for the email
+      const htmlContent = `
+        <h1>Daily Tracking Report</h1>
+        <p>Here are the tracking details for your domain ${client.domain}:</p>
+        <p>...Tracking details go here...</p>
+      `;
 
-      // Create report data (you can customize this part)
-      const reportData = trackingData.map(data => 
-        `URL: ${data.url}\nButtons: ${JSON.stringify(data.buttons)}\nLinks: ${JSON.stringify(data.links)}\n\n`
-      ).join('\n');
-
-      const mailOptions = {
-        from: process.env.EMAIL_USER,
-        to: email,
-        subject: 'Your Website Tracking Report',
-        text: `Here is your tracking report:\n\n${reportData}`
-      };
-
-      await transporter.sendMail(mailOptions);
+      await sendEmail(client.email, 'Daily Tracking Report', htmlContent);
     }
   } catch (error) {
-    console.error('Error sending tracking reports:', error.message);
+    console.error('Error sending daily reports:', error);
   }
 }
 
-// Schedule to send tracking reports every minute
-cron.schedule('12 9 * * *', sendTrackingReports);
+// Schedule daily email sending
+schedule.scheduleJob('* * * * *', sendDailyReports); // Sends email at 9 AM every day
+
+// Serve the dashboard page
+app.get('/dashboard', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/dashboard.html'));
+});
 
 app.listen(port, () => console.log(`Server running on port ${port}`));
