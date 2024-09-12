@@ -130,6 +130,6 @@ async function sendTrackingReports() {
 }
 
 // Schedule to send tracking reports every minute
-cron.schedule('* * * * *', sendTrackingReports);
+cron.schedule('12 9 * * *', sendTrackingReports);
 
 app.listen(port, () => console.log(`Server running on port ${port}`));
