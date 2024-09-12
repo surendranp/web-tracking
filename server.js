@@ -6,7 +6,7 @@ const path = require('path');
 require('dotenv').config();
 
 const app = express();
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 8080;  // Ensure the correct port is used
 
 // Middleware
 app.use(cors());
@@ -21,10 +21,7 @@ if (!mongoUri) {
 console.log('MongoDB URI:', mongoUri);
 
 // MongoDB Connection
-mongoose.connect(mongoUri, { 
-  useNewUrlParser: true,
-  useUnifiedTopology: true 
-})
+mongoose.connect(mongoUri)
   .then(() => console.log('MongoDB connected'))
   .catch(err => {
     console.error('MongoDB connection error:', err);
