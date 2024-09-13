@@ -33,13 +33,45 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Import and use routes
 const pageViews = require('./routes/pageViews');
-const registration = require('./routes/registration'); // Import the registration route
 app.use('/api/pageviews', pageViews);
-app.use('/api/register', registration); // Use the registration route
 
 // Serve the dashboard page
 app.get('/dashboard', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/dashboard.html'));
+});
+
+// Add route to handle client registration
+app.post('/api/register', async (req, res) => {
+  const { domain, email } = req.body;
+
+  if (!domain || !email) {
+    return res.status(400).send('Domain and email are required.');
+  }
+
+  const sanitizedDomain = domain.replace(/[.\$]/g, '_');
+
+  const emailSchema = new mongoose.Schema({
+    domain: { type: String, required: true },
+    email: { type: String, required: true },
+  });
+
+  try {
+    Email = mongoose.model('Email', emailSchema);
+  } catch (error) {
+    Email = mongoose.model('Email', emailSchema); // Define model only if it does not already exist
+  }
+
+  const existingEntry = await Email.findOne({ domain });
+
+  if (existingEntry) {
+    existingEntry.email = email;
+    await existingEntry.save();
+  } else {
+    const newEntry = new Email({ domain, email });
+    await newEntry.save();
+  }
+
+  res.status(200).send('Domain and email registered successfully.');
 });
 
 app.listen(port, () => console.log(`Server running on port ${port}`));

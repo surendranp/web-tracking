@@ -1,13 +1,44 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
+const nodemailer = require('nodemailer');
+const schedule = require('node-schedule');
 
 // Sanitize keys for safe storage in MongoDB
 function sanitizeKey(key) {
   return key.replace(/[.\$]/g, '_');
 }
 
-// POST route to collect tracking data
+// Define schemas and models
+const trackingSchema = new mongoose.Schema({
+  type: { type: String, required: true },
+  url: { type: String, required: true },
+  buttons: { type: Map, of: Number, default: {} },
+  links: { type: Map, of: Number, default: {} },
+  pageviews: [String],
+  timestamp: { type: Date, default: Date.now },
+  ip: { type: String, required: true },
+  sessionId: String,
+  duration: Number,
+});
+
+const emailSchema = new mongoose.Schema({
+  domain: { type: String, required: true },
+  email: { type: String, required: true },
+});
+
+let Tracking;
+let Email;
+
+async function getTrackingModel(domain) {
+  const collectionName = sanitizeKey(domain);
+  try {
+    return mongoose.model(collectionName);
+  } catch (error) {
+    return mongoose.model(collectionName, trackingSchema);
+  }
+}
+
 router.post('/', async (req, res) => {
   try {
     const { type, buttonName, linkName, url, ip, sessionId, domain } = req.body;
@@ -17,71 +48,95 @@ router.post('/', async (req, res) => {
       return res.status(400).send('Missing required fields');
     }
 
-    // Create a dynamic collection name based on the domain
-    const collectionName = sanitizeKey(domain); // Sanitize the domain name
-    const trackingSchema = new mongoose.Schema({
-      type: { type: String, required: true },
-      url: { type: String, required: true },
-      buttons: { type: Map, of: Number, default: {} },  // Store button click counts
-      links: { type: Map, of: Number, default: {} },    // Store link click counts
-      pageviews: [String],                              // Track navigation flow
-      timestamp: { type: Date, default: Date.now },
-      ip: { type: String, required: true },
-      sessionId: String,
-      duration: Number,
-    });
+    const Tracking = await getTrackingModel(domain);
 
-    let Tracking;
-
-    try {
-      Tracking = mongoose.model(collectionName);
-    } catch (error) {
-      Tracking = mongoose.model(collectionName, trackingSchema); // Define model only if it does not already exist
-    }
-
-    // Find the document by IP and sessionId
     let trackingData = await Tracking.findOne({ ip, sessionId });
 
     if (!trackingData) {
-      // Create a new document if none exists
       trackingData = new Tracking({
         type,
         url,
         ip,
         sessionId,
-        pageviews: [url] // Track the first pageview
+        pageviews: [url]
       });
     }
 
-    // Update pageviews for navigation flow
     if (type === 'pageview') {
       if (!trackingData.pageviews.includes(url)) {
         trackingData.pageviews.push(url);
       }
     }
 
-    // Track button clicks
     if (type === 'button_click') {
       const sanitizedButtonName = sanitizeKey(buttonName || '');
       trackingData.buttons.set(sanitizedButtonName, (trackingData.buttons.get(sanitizedButtonName) || 0) + 1);
     }
 
-    // Track link clicks
     if (type === 'link_click') {
       const sanitizedLinkName = sanitizeKey(linkName || '');
       trackingData.links.set(sanitizedLinkName, (trackingData.links.get(sanitizedLinkName) || 0) + 1);
     }
 
-    // Save updated tracking data
     await trackingData.save();
-
-    // Send tracking data to the client's email
-    // You'll need to add email sending logic here
 
     res.status(200).send('Data received');
   } catch (error) {
     console.error('Error saving tracking data:', error.message, error);
     res.status(500).send('Internal Server Error');
+  }
+});
+
+// Function to send email
+async function sendEmail(domain, data) {
+  const emailDoc = await Email.findOne({ domain });
+
+  if (!emailDoc) return;
+
+  const transporter = nodemailer.createTransport({
+    service: 'Gmail',
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS
+    }
+  });
+
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: emailDoc.email,
+    subject: `Tracking Data for ${domain}`,
+    text: JSON.stringify(data, null, 2)
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`Tracking data sent to ${emailDoc.email}`);
+  } catch (error) {
+    console.error('Error sending email:', error.message, error);
+  }
+}
+
+// Scheduled job to send tracking data every minute
+schedule.scheduleJob('* * * * *', async () => {
+  const domains = await Email.find().select('domain');
+
+  for (const domainObj of domains) {
+    const domain = domainObj.domain;
+    const Tracking = await getTrackingModel(domain);
+    
+    const now = new Date();
+    const sixAmToday = new Date(now.setHours(6, 0, 0, 0));
+    const sixPmToday = new Date(now.setHours(18, 0, 0, 0));
+    const sixPmYesterday = new Date(now.setDate(now.getDate() - 1)).setHours(18, 0, 0, 0);
+
+    const data = await Tracking.find({
+      timestamp: {
+        $gte: sixPmYesterday,
+        $lt: sixPmToday
+      }
+    });
+
+    await sendEmail(domain, data);
   }
 });
 
