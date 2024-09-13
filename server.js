@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
+const nodemailer = require('nodemailer'); // Add Nodemailer for sending emails
 require('dotenv').config();
 
 const app = express();
@@ -33,45 +34,77 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Import and use routes
 const pageViews = require('./routes/pageViews');
+const registration = require('./routes/registration'); // Add registration route
 app.use('/api/pageviews', pageViews);
+app.use('/api/register', registration); // Use registration route
 
 // Serve the dashboard page
 app.get('/dashboard', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/dashboard.html'));
 });
 
-// Route to handle client registration
-app.post('/api/register', async (req, res) => {
-  const { domain, email } = req.body;
-
-  if (!domain || !email) {
-    return res.status(400).send('Domain and email are required.');
+// Setup email transporter
+const transporter = nodemailer.createTransport({
+  service: 'gmail', // You can use any email service provider
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
   }
+});
 
-  const sanitizedDomain = domain.replace(/[.\$]/g, '_');
-
-  const emailSchema = new mongoose.Schema({
-    domain: { type: String, required: true },
-    email: { type: String, required: true },
-  });
+// Function to send email
+async function sendEmail(to, subject, text) {
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to,
+    subject,
+    text
+  };
 
   try {
-    Email = mongoose.model('Email', emailSchema);
+    await transporter.sendMail(mailOptions);
+    console.log(`Email sent to ${to}`);
   } catch (error) {
-    Email = mongoose.model('Email', emailSchema); // Define model only if it does not already exist
+    console.error('Error sending email:', error.message);
   }
+}
 
-  const existingEntry = await Email.findOne({ domain });
+// API to send tracking details via email
+app.post('/api/send-tracking-data', async (req, res) => {
+  try {
+    const { domain } = req.body;
 
-  if (existingEntry) {
-    existingEntry.email = email;
-    await existingEntry.save();
-  } else {
-    const newEntry = new Email({ domain, email });
-    await newEntry.save();
+    if (!domain) {
+      return res.status(400).send('Domain is required');
+    }
+
+    const sanitizedDomain = domain.replace(/[.\$]/g, '_'); // Sanitize domain name
+    const Tracking = mongoose.model(sanitizedDomain);
+    const trackingData = await Tracking.find({}); // Fetch all tracking data
+
+    if (!trackingData) {
+      return res.status(404).send('No tracking data found');
+    }
+
+    const client = await mongoose.model('Client').findOne({ domain });
+    if (!client) {
+      return res.status(404).send('Client not found');
+    }
+
+    const email = client.email;
+    if (!email) {
+      return res.status(404).send('Email not found for the domain');
+    }
+
+    // Prepare tracking details
+    const details = trackingData.map(data => JSON.stringify(data)).join('\n');
+
+    await sendEmail(email, 'Your Tracking Data', details);
+    res.status(200).send('Tracking data sent');
+  } catch (error) {
+    console.error('Error sending tracking data:', error.message);
+    res.status(500).send('Internal Server Error');
   }
-
-  res.status(200).send('Domain and email registered successfully.');
 });
 
 app.listen(port, () => console.log(`Server running on port ${port}`));
