@@ -4,6 +4,7 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
 const nodemailer = require('nodemailer');
+const cron = require('node-cron'); // Add node-cron
 require('dotenv').config();
 
 const app = express();
@@ -86,11 +87,6 @@ async function sendTrackingDataToClient(domain, email) {
   }
 }
 
-// Serve the dashboard page
-app.get('/dashboard', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/dashboard.html'));
-});
-
 // Automatically send tracking data via email for all registered domains
 async function sendTrackingDataToAllClients() {
   const Registration = mongoose.model('Registration');
@@ -102,7 +98,15 @@ async function sendTrackingDataToAllClients() {
   });
 }
 
-// Call this function periodically or based on your requirements
-// For example, every 24 hours (using node-schedule or a similar package)
+// Schedule the task to run every 2 minutes
+cron.schedule('*/2 * * * *', () => {
+  console.log('Running scheduled task to send tracking data...');
+  sendTrackingDataToAllClients();
+});
+
+// Serve the dashboard page
+app.get('/dashboard', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/dashboard.html'));
+});
 
 app.listen(port, () => console.log(`Server running on port ${port}`));
