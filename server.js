@@ -12,7 +12,7 @@ const port = process.env.PORT || 8080;
 
 // Middleware
 app.use(cors());
-app.use(bodyParser.json());
+app.use(bodyParser.json()); // Ensure that body-parser is used to handle JSON payloads
 
 // MongoDB URI
 const mongoUri = process.env.MONGODB_URI;
@@ -30,17 +30,34 @@ mongoose.connect(mongoUri)
     process.exit(1);
   });
 
-// Serve static files
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Registration schema (Define it only once)
+// Registration schema
 const RegistrationSchema = new mongoose.Schema({
   domain: String,
   email: String
 });
 const Registration = mongoose.model('Registration', RegistrationSchema);
 
-// Register route
+// Track pageviews - Add this route to handle POST requests from tracking script
+app.post('/api/pageviews', async (req, res) => {
+  const { domain, pageviewData } = req.body;
+
+  if (!domain || !pageviewData) {
+    return res.status(400).send('Domain and pageview data are required.');
+  }
+
+  try {
+    const collectionName = domain.replace(/\./g, '_');
+    const TrackingCollection = mongoose.connection.collection(collectionName);
+
+    await TrackingCollection.insertOne(pageviewData);
+    res.status(200).send('Pageview data stored successfully.');
+  } catch (error) {
+    console.error('Error storing pageview data:', error);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+// Registration route
 app.post('/api/register', async (req, res) => {
   const { domain, email } = req.body;
 
@@ -49,10 +66,8 @@ app.post('/api/register', async (req, res) => {
   }
 
   try {
-    // Save registration details
     const registration = new Registration({ domain, email });
     await registration.save();
-
     res.status(200).send('Registration successful.');
   } catch (error) {
     console.error('Error registering domain:', error);
@@ -60,7 +75,7 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// Send tracking data to email
+// Send tracking data to email (same as before)
 async function sendTrackingDataToClient(domain, email) {
   try {
     const collectionName = domain.replace(/\./g, '_');
@@ -95,12 +110,7 @@ async function sendTrackingDataToClient(domain, email) {
   }
 }
 
-// Serve the dashboard page
-app.get('/dashboard', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/dashboard.html'));
-});
-
-// Automatically send tracking data via email for all registered domains
+// Automatically send tracking data for all registered domains
 async function sendTrackingDataToAllClients() {
   const registrations = await Registration.find();
 
@@ -109,7 +119,7 @@ async function sendTrackingDataToAllClients() {
   });
 }
 
-// Schedule email task every 2 minutes
+// Schedule email task every 2 minutes (same as before)
 cron.schedule('*/2 * * * *', () => {
   console.log('Running scheduled task to send tracking data...');
   sendTrackingDataToAllClients();
