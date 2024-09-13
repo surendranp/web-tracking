@@ -75,7 +75,7 @@ app.post('/api/register', async (req, res) => {
       from: process.env.EMAIL_USER,
       to: email,
       subject: 'Tracking Script Instructions',
-      text: `Add this script to your website:\n\n<script src="https://your-server-url/tracking.js"></script>`
+      text: `Add this script to your website:\n\n<script src="https://web-tracking-mongodburi.up.railway.app/tracking.js"></script>`
     };
 
     await transporter.sendMail(mailOptions);
@@ -88,7 +88,7 @@ app.post('/api/register', async (req, res) => {
 // Function to fetch tracking data from MongoDB
 async function fetchTrackingData(domain) {
   const sanitizedDomain = domain.replace(/[.\$]/g, '_');
-  const Tracking = mongoose.model(sanitizedDomain, new mongoose.Schema({}, { strict: false }));
+  const Tracking = mongoose.model(sanitizedDomain);
 
   // Time periods to fetch the data (last 24 hours)
   const now = new Date();
