@@ -4,9 +4,8 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
 const nodemailer = require('nodemailer');
-const cron = require('node-cron');
+const cron = require('node-cron'); // For scheduling tasks
 require('dotenv').config();
-const { Registration } = require('./models'); // Import the model
 
 const app = express();
 const port = process.env.PORT || 8080;
@@ -38,7 +37,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 const pageViews = require('./routes/pageViews');
 app.use('/api/pageviews', pageViews);
 
-// Register route
+// Register route for domain and email
 app.post('/api/register', async (req, res) => {
   const { domain, email } = req.body;
 
@@ -47,10 +46,14 @@ app.post('/api/register', async (req, res) => {
   }
 
   try {
+    const Registration = mongoose.model('Registration', new mongoose.Schema({
+      domain: String,
+      email: String
+    }));
+
     const registration = new Registration({ domain, email });
     await registration.save();
 
-    // Display the script URL on the home page
     res.status(200).send('Registration successful.');
   } catch (error) {
     console.error('Error registering domain:', error);
@@ -58,16 +61,28 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// Send tracking data to email
+// Function to send tracking data to the client via email
 async function sendTrackingDataToClient(domain, email) {
   const collectionName = domain.replace(/[.\$]/g, '_'); // Sanitize domain name
 
   // Check if the model has already been compiled
   let Tracking;
   if (mongoose.models[collectionName]) {
-    Tracking = mongoose.models[collectionName]; // Use the existing model
+    Tracking = mongoose.models[collectionName]; // Use existing model
   } else {
-    Tracking = mongoose.model(collectionName, new mongoose.Schema({}), collectionName); // Define and use the schema
+    // Define the schema based on tracking data structure
+    const trackingSchema = new mongoose.Schema({
+      url: String,
+      type: String,
+      ip: String,
+      sessionId: String,
+      timestamp: Date,
+      buttons: Object,
+      links: Object
+    });
+
+    // Create the model dynamically using the collectionName
+    Tracking = mongoose.model(collectionName, trackingSchema, collectionName);
   }
 
   const transporter = nodemailer.createTransport({
@@ -79,16 +94,23 @@ async function sendTrackingDataToClient(domain, email) {
   });
 
   try {
-    const trackingData = await Tracking.find(); // Retrieve all tracking data for the domain
+    // Retrieve all tracking data for the domain
+    const trackingData = await Tracking.find().lean(); // Use lean for better performance
 
-    // Format tracking data
+    // Check if there is any data to send
+    if (!trackingData.length) {
+      console.log(`No tracking data available for ${domain}`);
+      return;
+    }
+
+    // Format tracking data for email
     let dataText = `Tracking data for ${domain}:\n\n`;
     trackingData.forEach(doc => {
       dataText += `URL: ${doc.url}\n`;
       dataText += `Type: ${doc.type}\n`;
       dataText += `IP: ${doc.ip}\n`;
       dataText += `Session ID: ${doc.sessionId}\n`;
-      dataText += `Timestamp: ${doc.timestamp}\n`;
+      dataText += `Timestamp: ${new Date(doc.timestamp).toLocaleString()}\n`;
       dataText += `Buttons Clicked: ${JSON.stringify(doc.buttons)}\n`;
       dataText += `Links Clicked: ${JSON.stringify(doc.links)}\n\n`;
     });
@@ -107,8 +129,10 @@ async function sendTrackingDataToClient(domain, email) {
   }
 }
 
-// Automatically send tracking data via email for all registered domains
+// Function to send tracking data to all registered clients
 async function sendTrackingDataToAllClients() {
+  const Registration = mongoose.model('Registration');
+
   const registrations = await Registration.find();
 
   registrations.forEach(async (reg) => {
@@ -117,9 +141,14 @@ async function sendTrackingDataToAllClients() {
 }
 
 // Schedule the task to run every 2 minutes
-cron.schedule('*/2 * * * *', () => {
+cron.schedule('*/2 * * * *', async () => {
   console.log('Running scheduled task to send tracking data...');
-  sendTrackingDataToAllClients();
+  await sendTrackingDataToAllClients();
+});
+
+// Serve the dashboard page
+app.get('/dashboard', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/dashboard.html'));
 });
 
 app.listen(port, () => console.log(`Server running on port ${port}`));
