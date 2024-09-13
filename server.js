@@ -34,16 +34,11 @@ mongoose.connect(mongoUri)
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Reuse or create the Registration model
-let Registration;
-try {
-  Registration = mongoose.model('Registration');
-} catch (error) {
-  const registrationSchema = new mongoose.Schema({
-    domain: String,
-    email: String
-  });
-  Registration = mongoose.model('Registration', registrationSchema);
-}
+const registrationSchema = new mongoose.Schema({
+  domain: String,
+  email: String
+});
+const Registration = mongoose.models.Registration || mongoose.model('Registration', registrationSchema);
 
 // Register route for domain and email
 app.post('/api/register', async (req, res) => {
