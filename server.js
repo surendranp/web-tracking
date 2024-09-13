@@ -28,38 +28,12 @@ mongoose.connect(mongoUri)
     process.exit(1);
   });
 
-// Define the schema and model for storing domain and email
-const registrationSchema = new mongoose.Schema({
-  domain: { type: String, required: true },
-  email: { type: String, required: true }
-});
-
-const Registration = mongoose.model('Registration', registrationSchema);
-
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Import and use routes
 const pageViews = require('./routes/pageViews');
 app.use('/api/pageviews', pageViews);
-
-// Register endpoint
-app.post('/api/register', async (req, res) => {
-  try {
-    const { domain, email } = req.body;
-    if (!domain || !email) {
-      return res.status(400).send('Missing required fields');
-    }
-
-    const newRegistration = new Registration({ domain, email });
-    await newRegistration.save();
-
-    res.status(200).send('Registration successful');
-  } catch (error) {
-    console.error('Error registering domain and email:', error.message);
-    res.status(500).send('Internal Server Error');
-  }
-});
 
 // Serve the dashboard page
 app.get('/dashboard', (req, res) => {
