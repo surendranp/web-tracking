@@ -3,7 +3,8 @@ const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
-const nodemailer = require('nodemailer');  // Added for email functionality
+const nodemailer = require('nodemailer');  // For email functionality
+const cron = require('node-cron'); // For scheduling daily email reports
 require('dotenv').config();
 
 const app = express();
@@ -91,18 +92,37 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// Email sending cron job (daily report)
-const cron = require('node-cron');
-
+// Daily email cron job
 cron.schedule('0 9 * * *', async () => {
+  const Registration = mongoose.model('Registration');
   const registrations = await Registration.find();
 
   registrations.forEach(async registration => {
     const { domain, email } = registration;
 
-    // Fetch and compile daily tracking data here (dummy data for now)
-    const dailyData = 'Tracking data for today...'; // Fetch and process actual data
+    // Fetch tracking data for the current domain
+    const collectionName = domain.replace(/[.\$]/g, '_'); // Sanitize domain name
+    let Tracking;
+    
+    try {
+      Tracking = mongoose.model(collectionName);
+    } catch (error) {
+      console.error(`No data found for domain: ${domain}`);
+      return;
+    }
 
+    // Fetch data from the domain collection (last 24 hours data)
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 1);
+    
+    const dailyData = await Tracking.find({ timestamp: { $gte: startDate } });
+
+    // Compile data
+    const dataSummary = dailyData.length 
+      ? dailyData.map(entry => `URL: ${entry.url}, Pageviews: ${entry.pageviews.join(', ')}`).join('\n')
+      : 'No activity recorded in the last 24 hours.';
+
+    // Send the email
     let transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
@@ -115,7 +135,7 @@ cron.schedule('0 9 * * *', async () => {
       from: process.env.EMAIL_USER,
       to: email,
       subject: 'Daily Tracking Report',
-      text: `Here is your daily tracking report for ${domain}:\n\n${dailyData}`
+      text: `Here is your daily tracking report for ${domain}:\n\n${dataSummary}`
     };
 
     await transporter.sendMail(mailOptions);
