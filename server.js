@@ -33,7 +33,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Import and use routes
 const pageViews = require('./routes/pageViews');
+const registration = require('./routes/registration'); // Import the registration route
 app.use('/api/pageviews', pageViews);
+app.use('/api/register', registration); // Use the registration route
 
 // Serve the dashboard page
 app.get('/dashboard', (req, res) => {

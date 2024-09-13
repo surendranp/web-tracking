@@ -75,6 +75,9 @@ router.post('/', async (req, res) => {
     // Save updated tracking data
     await trackingData.save();
 
+    // Send tracking data to the client's email
+    // You'll need to add email sending logic here
+
     res.status(200).send('Data received');
   } catch (error) {
     console.error('Error saving tracking data:', error.message, error);

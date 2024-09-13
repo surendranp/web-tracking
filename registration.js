@@ -2,13 +2,13 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 
-// Schema for storing domain and email
-const clientSchema = new mongoose.Schema({
+// Define schema and model for registrations
+const registrationSchema = new mongoose.Schema({
   domain: { type: String, required: true },
   email: { type: String, required: true }
 });
 
-const Client = mongoose.model('Client', clientSchema);
+const Registration = mongoose.model('Registration', registrationSchema);
 
 // POST route to register domain and email
 router.post('/', async (req, res) => {
@@ -16,24 +16,22 @@ router.post('/', async (req, res) => {
     const { domain, email } = req.body;
 
     if (!domain || !email) {
-      console.error('Error: Missing required fields');
-      return res.status(400).send('Missing required fields');
+      return res.status(400).send('Domain and email are required');
     }
 
-    const existingClient = await Client.findOne({ domain });
-    if (existingClient) {
-      // Update existing client with new email
-      existingClient.email = email;
-      await existingClient.save();
-    } else {
-      // Create new client entry
-      const newClient = new Client({ domain, email });
-      await newClient.save();
+    // Check if the domain already exists
+    const existingRegistration = await Registration.findOne({ domain });
+    if (existingRegistration) {
+      return res.status(400).send('Domain is already registered');
     }
 
-    res.status(200).send('Domain and email registered successfully');
+    // Save the registration
+    const newRegistration = new Registration({ domain, email });
+    await newRegistration.save();
+
+    res.status(200).send('Registration successful');
   } catch (error) {
-    console.error('Error registering domain:', error.message);
+    console.error('Error registering domain:', error.message, error);
     res.status(500).send('Internal Server Error');
   }
 });
