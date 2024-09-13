@@ -33,6 +33,11 @@ mongoose.connect(mongoUri)
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Serve home.html on base URL
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/home.html'));
+});
+
 // Import and use routes
 const pageViews = require('./routes/pageViews');
 app.use('/api/pageviews', pageViews);
