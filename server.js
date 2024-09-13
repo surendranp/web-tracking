@@ -12,7 +12,10 @@ const port = process.env.PORT || 8080;
 
 // Middleware
 app.use(cors());
-app.use(bodyParser.json()); // Ensure that body-parser is used to handle JSON payloads
+app.use(bodyParser.json());
+
+// Serve static files like tracking.js from the public directory
+app.use(express.static(path.join(__dirname, 'public')));
 
 // MongoDB URI
 const mongoUri = process.env.MONGODB_URI;
@@ -37,7 +40,7 @@ const RegistrationSchema = new mongoose.Schema({
 });
 const Registration = mongoose.model('Registration', RegistrationSchema);
 
-// Track pageviews - Add this route to handle POST requests from tracking script
+// Route to handle tracking data
 app.post('/api/pageviews', async (req, res) => {
   const { domain, pageviewData } = req.body;
 
@@ -75,7 +78,7 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// Send tracking data to email (same as before)
+// Send tracking data to email
 async function sendTrackingDataToClient(domain, email) {
   try {
     const collectionName = domain.replace(/\./g, '_');
@@ -119,7 +122,7 @@ async function sendTrackingDataToAllClients() {
   });
 }
 
-// Schedule email task every 2 minutes (same as before)
+// Schedule email task every 2 minutes
 cron.schedule('*/2 * * * *', () => {
   console.log('Running scheduled task to send tracking data...');
   sendTrackingDataToAllClients();
