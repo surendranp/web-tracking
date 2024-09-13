@@ -144,8 +144,8 @@ async function sendTrackingDataToAllClients() {
   }
 }
 
-// Schedule the task to run every day
-cron.schedule('* * * * *', async () => {
+// Schedule the task to run every day at midnight
+cron.schedule('0 0 * * *', async () => {
   console.log('Running scheduled task to send tracking data...');
   await sendTrackingDataToAllClients();
 });
