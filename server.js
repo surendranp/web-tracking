@@ -58,7 +58,7 @@ app.post('/api/register', async (req, res) => {
     res.status(200).send('Registration successful.');
   } catch (error) {
     console.error('Error registering domain:', error);
-    res.status(500).send('Internal Server Error');
+    res.status(500).send('Internal Server Error or your domain and email ID allready exist');
   }
 });
 
