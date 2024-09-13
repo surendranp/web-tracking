@@ -1,21 +1,18 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
-const cors = require('cors');  // Ensure CORS is imported
+const cors = require('cors');
 const path = require('path');
 const nodemailer = require('nodemailer');
-const cron = require('node-cron');
+const cron = require('node-cron'); // For scheduling tasks
 require('dotenv').config();
 
 const app = express();
 const port = process.env.PORT || 8080;
 
 // Middleware
-app.use(cors());  // Enable CORS for all routes
+app.use(cors());
 app.use(bodyParser.json());
-
-// Serve static files like tracking.js from the public directory
-app.use(express.static(path.join(__dirname, 'public')));
 
 // MongoDB URI
 const mongoUri = process.env.MONGODB_URI;
@@ -33,34 +30,22 @@ mongoose.connect(mongoUri)
     process.exit(1);
   });
 
-// Registration schema
-const RegistrationSchema = new mongoose.Schema({
-  domain: String,
-  email: String
-});
-const Registration = mongoose.model('Registration', RegistrationSchema);
+// Serve static files
+app.use(express.static(path.join(__dirname, 'public')));
 
-// Route to handle tracking data
-app.post('/api/pageviews', async (req, res) => {
-  const { domain, pageviewData } = req.body;
+// Reuse or create the Registration model
+let Registration;
+try {
+  Registration = mongoose.model('Registration');
+} catch (error) {
+  const registrationSchema = new mongoose.Schema({
+    domain: String,
+    email: String
+  });
+  Registration = mongoose.model('Registration', registrationSchema);
+}
 
-  if (!domain || !pageviewData) {
-    return res.status(400).send('Domain and pageview data are required.');
-  }
-
-  try {
-    const collectionName = domain.replace(/\./g, '_');
-    const TrackingCollection = mongoose.connection.collection(collectionName);
-
-    await TrackingCollection.insertOne(pageviewData);
-    res.status(200).send('Pageview data stored successfully.');
-  } catch (error) {
-    console.error('Error storing pageview data:', error);
-    res.status(500).send('Internal Server Error');
-  }
-});
-
-// Registration route
+// Register route for domain and email
 app.post('/api/register', async (req, res) => {
   const { domain, email } = req.body;
 
@@ -78,32 +63,65 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// Send tracking data to email
+// Function to send tracking data to the client via email
 async function sendTrackingDataToClient(domain, email) {
+  const collectionName = domain.replace(/[.\$]/g, '_'); // Sanitize domain name
+
+  // Check if the model has already been compiled
+  let Tracking;
+  if (mongoose.models[collectionName]) {
+    Tracking = mongoose.models[collectionName]; // Use existing model
+  } else {
+    // Define the schema based on tracking data structure
+    const trackingSchema = new mongoose.Schema({
+      url: String,
+      type: String,
+      ip: String,
+      sessionId: String,
+      timestamp: Date,
+      buttons: Object,
+      links: Object
+    });
+
+    // Create the model dynamically using the collectionName
+    Tracking = mongoose.model(collectionName, trackingSchema, collectionName);
+  }
+
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS
+    }
+  });
+
   try {
-    const collectionName = domain.replace(/\./g, '_');
-    const TrackingData = mongoose.connection.collection(collectionName);
+    // Retrieve all tracking data for the domain
+    const trackingData = await Tracking.find().lean(); // Use lean for better performance
 
-    const trackingData = await TrackingData.find({}).toArray();
-
-    if (trackingData.length === 0) {
-      console.log(`No tracking data found for domain: ${domain}`);
+    // Check if there is any data to send
+    if (!trackingData.length) {
+      console.log(`No tracking data available for ${domain}`);
       return;
     }
 
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-      }
+    // Format tracking data for email
+    let dataText = `Tracking data for ${domain}:\n\n`;
+    trackingData.forEach(doc => {
+      dataText += `URL: ${doc.url}\n`;
+      dataText += `Type: ${doc.type}\n`;
+      dataText += `IP: ${doc.ip}\n`;
+      dataText += `Session ID: ${doc.sessionId}\n`;
+      dataText += `Timestamp: ${new Date(doc.timestamp).toLocaleString()}\n`;
+      dataText += `Buttons Clicked: ${JSON.stringify(doc.buttons)}\n`;
+      dataText += `Links Clicked: ${JSON.stringify(doc.links)}\n\n`;
     });
 
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
       subject: `Tracking Data for ${domain}`,
-      text: `Here is the tracking data for ${domain}:\n\n` + JSON.stringify(trackingData, null, 2)
+      text: dataText || 'No tracking data available.'
     };
 
     await transporter.sendMail(mailOptions);
@@ -113,7 +131,7 @@ async function sendTrackingDataToClient(domain, email) {
   }
 }
 
-// Automatically send tracking data for all registered domains
+// Function to send tracking data to all registered clients
 async function sendTrackingDataToAllClients() {
   const registrations = await Registration.find();
 
@@ -122,11 +140,15 @@ async function sendTrackingDataToAllClients() {
   });
 }
 
-// Schedule email task every 2 minutes
-cron.schedule('*/2 * * * *', () => {
+// Schedule the task to run every 2 minutes
+cron.schedule('*/2 * * * *', async () => {
   console.log('Running scheduled task to send tracking data...');
-  sendTrackingDataToAllClients();
+  await sendTrackingDataToAllClients();
 });
 
-// Start the server
+// Serve the dashboard page
+app.get('/dashboard', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/dashboard.html'));
+});
+
 app.listen(port, () => console.log(`Server running on port ${port}`));
