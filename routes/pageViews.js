@@ -51,25 +51,23 @@ router.post('/', async (req, res) => {
         sessionId,
         pageviews: [url] // Track the first pageview
       });
-    }
-
-    // Update pageviews for navigation flow
-    if (type === 'pageview') {
-      if (!trackingData.pageviews.includes(url)) {
-        trackingData.pageviews.push(url);
+    } else {
+      // Update existing document
+      if (type === 'pageview') {
+        if (!trackingData.pageviews.includes(url)) {
+          trackingData.pageviews.push(url);
+        }
       }
-    }
-
-    // Track button clicks
-    if (type === 'button_click') {
-      const sanitizedButtonName = sanitizeKey(buttonName || '');
-      trackingData.buttons.set(sanitizedButtonName, (trackingData.buttons.get(sanitizedButtonName) || 0) + 1);
-    }
-
-    // Track link clicks
-    if (type === 'link_click') {
-      const sanitizedLinkName = sanitizeKey(linkName || '');
-      trackingData.links.set(sanitizedLinkName, (trackingData.links.get(sanitizedLinkName) || 0) + 1);
+    
+      if (type === 'button_click') {
+        const sanitizedButtonName = sanitizeKey(buttonName || '');
+        trackingData.buttons.set(sanitizedButtonName, (trackingData.buttons.get(sanitizedButtonName) || 0) + 1);
+      }
+    
+      if (type === 'link_click') {
+        const sanitizedLinkName = sanitizeKey(linkName || '');
+        trackingData.links.set(sanitizedLinkName, (trackingData.links.get(sanitizedLinkName) || 0) + 1);
+      }
     }
 
     // Save updated tracking data
