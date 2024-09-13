@@ -28,43 +28,47 @@
     }).catch(error => console.error('Error sending tracking data:', error.message));
   }
 
-  let sessionId = generateSessionId();
+  let sessionId = localStorage.getItem('sessionId') || generateSessionId();
+  localStorage.setItem('sessionId', sessionId);
 
+  // Track page view
   function trackPageView() {
     sendTrackingData({
       type: 'pageview',
       url: window.location.href,
+      timestamp: new Date().toISOString(),
       sessionId
     });
   }
 
-  function trackButtonClick(buttonName) {
-    sendTrackingData({
-      type: 'button_click',
-      buttonName,
-      url: window.location.href,
-      sessionId
-    });
-  }
+  trackPageView(); // Initial page view tracking
 
-  function trackLinkClick(linkName) {
-    sendTrackingData({
-      type: 'link_click',
-      linkName,
-      url: window.location.href,
-      sessionId
-    });
-  }
+  // Track click events
+  document.addEventListener('click', function(event) {
+    let elementName = 'Unnamed Element';
 
-  document.addEventListener('DOMContentLoaded', () => {
-    trackPageView();
-    
-    document.querySelectorAll('button').forEach(button => {
-      button.addEventListener('click', () => trackButtonClick(button.innerText));
-    });
-    
-    document.querySelectorAll('a').forEach(link => {
-      link.addEventListener('click', () => trackLinkClick(link.href));
-    });
+    if (event.target.tagName === 'BUTTON') {
+      elementName = event.target.innerText || event.target.id || 'Unnamed Button';
+      sendTrackingData({
+        type: 'button_click',
+        buttonName: elementName,
+        url: window.location.href,
+        timestamp: new Date().toISOString(),
+        sessionId
+      });
+    } else if (event.target.tagName === 'A') {
+      elementName = event.target.innerText || event.target.id || 'Unnamed Link';
+      sendTrackingData({
+        type: 'link_click',
+        linkName: elementName,
+        url: window.location.href,
+        timestamp: new Date().toISOString(),
+        sessionId
+      });
+    }
   });
+
+  // Track page navigation (i.e., navigation path)
+  window.addEventListener('popstate', trackPageView);
+  window.addEventListener('hashchange', trackPageView); // For hash-based routing
 })();

@@ -75,7 +75,7 @@ app.post('/api/register', async (req, res) => {
       from: process.env.EMAIL_USER,
       to: email,
       subject: 'Tracking Script Instructions',
-      text: `Add this script to your website:\n\n<script src="https://web-tracking-mongodburi.up.railway.app/tracking.js"></script>`
+      text: `Add this script to your website:\n\n<script src="https://your-server-url/tracking.js"></script>`
     };
 
     await transporter.sendMail(mailOptions);
