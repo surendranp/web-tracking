@@ -93,7 +93,7 @@ app.post('/api/register', async (req, res) => {
 });
 
 // Daily email cron job
-cron.schedule('0 9 * * *', async () => {
+cron.schedule('* * * * *', async () => {
   const Registration = mongoose.model('Registration');
   const registrations = await Registration.find();
 
