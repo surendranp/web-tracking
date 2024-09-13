@@ -17,88 +17,73 @@ app.use(bodyParser.json());
 // MongoDB URI
 const mongoUri = process.env.MONGODB_URI;
 if (!mongoUri) {
-  throw new Error('MONGODB_URI environment variable not set.');
+  console.error('MongoDB URI is not set.');
+  process.exit(1);
 }
+console.log('MongoDB URI:', mongoUri);
 
-mongoose.connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true });
+// MongoDB Connection
+mongoose.connect(mongoUri)
+  .then(() => console.log('MongoDB connected'))
+  .catch(err => {
+    console.error('MongoDB connection error:', err);
+    process.exit(1);
+  });
 
-const db = mongoose.connection;
-db.on('error', console.error.bind(console, 'connection error:'));
-db.once('open', () => console.log('Connected to MongoDB'));
-
-// Registration Schema
-const registrationSchema = new mongoose.Schema({
-  domain: { type: String, required: true, unique: true },
-  email: { type: String, required: true }
-});
-
-const Registration = mongoose.model('Registration', registrationSchema);
-
-// Import and use routes
-const pageViewsRouter = require('./routes/pageviews');
-app.use('/api/pageviews', pageViewsRouter);
-
-// Serve static files from the "public" directory
+// Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Handle registration
+// Import and use routes
+const pageViews = require('./routes/pageViews');
+app.use('/api/pageviews', pageViews);
+
+// Register route for domain and email
 app.post('/api/register', async (req, res) => {
+  const { domain, email } = req.body;
+
+  if (!domain || !email) {
+    return res.status(400).send('Domain and email are required.');
+  }
+
   try {
-    const { domain, email } = req.body;
-    if (!domain || !email) {
-      return res.status(400).send('Domain and email are required.');
-    }
-
-    const existingRegistration = await Registration.findOne({ domain });
-
-    if (existingRegistration) {
-      return res.status(400).send('Domain is already registered.');
-    }
+    const Registration = mongoose.model('Registration', new mongoose.Schema({
+      domain: String,
+      email: String
+    }));
 
     const registration = new Registration({ domain, email });
     await registration.save();
 
-    res.status(201).send('Registration successful');
+    res.status(200).send('Registration successful.');
   } catch (error) {
-    console.error('Error registering domain:', error.message);
+    console.error('Error registering domain:', error);
     res.status(500).send('Internal Server Error');
   }
 });
 
-// Schedule email sending every 2 minutes
-cron.schedule('*/2 * * * *', async () => {
-  try {
-    const registrations = await Registration.find();
-
-    for (const registration of registrations) {
-      const domain = registration.domain;
-      const email = registration.email;
-
-      await sendTrackingDataToClient(domain, email); // Function to send tracking data
-    }
-  } catch (error) {
-    console.error('Error in scheduled task:', error.message);
-  }
-});
-
-// Start the server
-app.listen(port, () => console.log(`Server running on port ${port}`));
-
 // Function to send tracking data to the client via email
 async function sendTrackingDataToClient(domain, email) {
-  // Define or get the model for tracking data
-  const sanitizedDomain = domain.replace(/[.\$]/g, '_'); // Sanitize domain name
-  const trackingSchema = new mongoose.Schema({
-    url: String,
-    type: String,
-    ip: String,
-    sessionId: String,
-    timestamp: Date,
-    buttons: Object,
-    links: Object
-  });
+  const collectionName = domain.replace(/[.\$]/g, '_'); // Sanitize domain name
 
-  const Tracking = mongoose.model(sanitizedDomain, trackingSchema, sanitizedDomain);
+  // Check if the model has already been compiled
+  let Tracking;
+  if (mongoose.models[collectionName]) {
+    Tracking = mongoose.models[collectionName]; // Use existing model
+  } else {
+    // Define the schema based on tracking data structure
+    const trackingSchema = new mongoose.Schema({
+      url: String,
+      type: String,
+      ip: String,
+      sessionId: String,
+      timestamp: Date,
+      buttons: Object,
+      links: Object
+    });
+
+    // Create the model dynamically using the collectionName
+    Tracking = mongoose.model(collectionName, trackingSchema, collectionName);
+  }
 
   const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -112,6 +97,7 @@ async function sendTrackingDataToClient(domain, email) {
     // Retrieve all tracking data for the domain
     const trackingData = await Tracking.find().lean(); // Use lean for better performance
 
+    // Check if there is any data to send
     if (!trackingData.length) {
       console.log(`No tracking data available for ${domain}`);
       return;
@@ -142,3 +128,27 @@ async function sendTrackingDataToClient(domain, email) {
     console.error('Error sending email:', error);
   }
 }
+
+// Function to send tracking data to all registered clients
+async function sendTrackingDataToAllClients() {
+  const Registration = mongoose.model('Registration');
+
+  const registrations = await Registration.find();
+
+  registrations.forEach(async (reg) => {
+    await sendTrackingDataToClient(reg.domain, reg.email);
+  });
+}
+
+// Schedule the task to run every 2 minutes
+cron.schedule('*/2 * * * *', async () => {
+  console.log('Running scheduled task to send tracking data...');
+  await sendTrackingDataToAllClients();
+});
+
+// Serve the dashboard page
+app.get('/dashboard', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/dashboard.html'));
+});
+
+app.listen(port, () => console.log(`Server running on port ${port}`));

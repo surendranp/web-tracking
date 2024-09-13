@@ -75,80 +75,11 @@ router.post('/', async (req, res) => {
     // Save updated tracking data
     await trackingData.save();
 
-    // Send tracking data to the client
-    const Registration = mongoose.model('Registration');
-    const registration = await Registration.findOne({ domain });
-
-    if (registration) {
-      const email = registration.email;
-      await sendTrackingDataToClient(domain, email);
-    }
-
     res.status(200).send('Data received');
   } catch (error) {
     console.error('Error saving tracking data:', error.message, error);
     res.status(500).send('Internal Server Error');
   }
 });
-
-// Function to send tracking data to the client via email
-async function sendTrackingDataToClient(domain, email) {
-  const collectionName = domain.replace(/[.\$]/g, '_'); // Sanitize domain name
-
-  // Define or get the model for tracking data
-  const trackingSchema = new mongoose.Schema({
-    url: String,
-    type: String,
-    ip: String,
-    sessionId: String,
-    timestamp: Date,
-    buttons: Object,
-    links: Object
-  });
-
-  const Tracking = mongoose.model(collectionName, trackingSchema, collectionName);
-
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS
-    }
-  });
-
-  try {
-    // Retrieve all tracking data for the domain
-    const trackingData = await Tracking.find().lean(); // Use lean for better performance
-
-    if (!trackingData.length) {
-      console.log(`No tracking data available for ${domain}`);
-      return;
-    }
-
-    // Format tracking data for email
-    let dataText = `Tracking data for ${domain}:\n\n`;
-    trackingData.forEach(doc => {
-      dataText += `URL: ${doc.url}\n`;
-      dataText += `Type: ${doc.type}\n`;
-      dataText += `IP: ${doc.ip}\n`;
-      dataText += `Session ID: ${doc.sessionId}\n`;
-      dataText += `Timestamp: ${new Date(doc.timestamp).toLocaleString()}\n`;
-      dataText += `Buttons Clicked: ${JSON.stringify(doc.buttons)}\n`;
-      dataText += `Links Clicked: ${JSON.stringify(doc.links)}\n\n`;
-    });
-
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: email,
-      subject: `Tracking Data for ${domain}`,
-      text: dataText || 'No tracking data available.'
-    };
-
-    await transporter.sendMail(mailOptions);
-    console.log(`Tracking data sent to ${email}`);
-  } catch (error) {
-    console.error('Error sending email:', error);
-  }
-}
 
 module.exports = router;
