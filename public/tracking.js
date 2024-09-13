@@ -1,5 +1,5 @@
 (function() {
-  const trackingUrl = 'https://web-tracking-production.up.railway.app/api/pageviews'; // Replace with your actual API URL
+  const trackingUrl = 'https://web-tracking-mongodburi.up.railway.app/api/pageviews'; // Replace with your actual API URL
 
   async function getUserIP() {
     try {
