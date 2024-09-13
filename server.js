@@ -132,16 +132,15 @@ async function sendTrackingDataToClient(domain, email) {
 // Function to send tracking data to all registered clients
 async function sendTrackingDataToAllClients() {
   const Registration = mongoose.model('Registration');
-
   const registrations = await Registration.find();
 
-  registrations.forEach(async (reg) => {
+  for (const reg of registrations) {
     await sendTrackingDataToClient(reg.domain, reg.email);
-  });
+  }
 }
 
-// Schedule the task to run every 2 minutes
-cron.schedule('*/2 * * * *', async () => {
+// Schedule the task to run every day
+cron.schedule('0 0 * * *', async () => {
   console.log('Running scheduled task to send tracking data...');
   await sendTrackingDataToAllClients();
 });
