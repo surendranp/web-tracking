@@ -90,34 +90,21 @@ async function fetchTrackingData(domain) {
   const sanitizedDomain = domain.replace(/[.\$]/g, '_');
   const Tracking = mongoose.model(sanitizedDomain, new mongoose.Schema({}, { strict: false }));
 
-  // Time periods to fetch the data (6 AM - 6 PM and 6:01 PM - 5:59 AM)
-  const morningStart = new Date();
-  morningStart.setHours(6, 0, 0, 0);
-  
-  const morningEnd = new Date();
-  morningEnd.setHours(17, 59, 59, 999);
+  // Time periods to fetch the data (last 24 hours)
+  const now = new Date();
+  const startOfDay = new Date(now.setHours(0, 0, 0, 0));
+  const endOfDay = new Date(now.setHours(23, 59, 59, 999));
 
-  const eveningStart = new Date(morningEnd);
-  eveningStart.setSeconds(eveningStart.getSeconds() + 1);
-
-  const nextDayMorningEnd = new Date();
-  nextDayMorningEnd.setHours(5, 59, 59, 999);
-  nextDayMorningEnd.setDate(nextDayMorningEnd.getDate() + 1);
-
-  // Fetch morning and evening data
-  const morningData = await Tracking.find({
-    timestamp: { $gte: morningStart, $lte: morningEnd }
+  // Fetch data for the last 24 hours
+  const trackingData = await Tracking.find({
+    timestamp: { $gte: startOfDay, $lte: endOfDay }
   });
 
-  const eveningData = await Tracking.find({
-    timestamp: { $gte: eveningStart, $lte: nextDayMorningEnd }
-  });
-
-  return { morningData, eveningData };
+  return trackingData;
 }
 
-// Daily cron job to send email with tracking data
-cron.schedule('0 9 * * *', async () => {
+// Cron job to send email with tracking data every minute
+cron.schedule('* * * * *', async () => {
   const Registration = mongoose.model('Registration');
   const registrations = await Registration.find();
 
@@ -125,20 +112,15 @@ cron.schedule('0 9 * * *', async () => {
     const { domain, email } = registration;
 
     // Fetch the tracking data
-    const { morningData, eveningData } = await fetchTrackingData(domain);
+    const trackingData = await fetchTrackingData(domain);
 
     // Prepare the report
-    let report = `Daily Tracking Report for ${domain}\n\nMorning (6:00 AM to 6:00 PM):\n`;
-    morningData.forEach(data => {
-      report += `URL: ${data.url}, Page Views: ${data.pageviews.length}, Buttons Clicked: ${[...data.buttons.entries()].map(([btn, count]) => `${btn}: ${count}`).join(', ')}\n`;
+    let report = `Tracking Report for ${domain}\n\n`;
+    trackingData.forEach(data => {
+      report += `URL: ${data.url}, Page Views: ${data.pageviews.length}, Buttons Clicked: ${[...data.buttons.entries()].map(([btn, count]) => `${btn}: ${count}`).join(', ')}, Links Clicked: ${[...data.links.entries()].map(([link, count]) => `${link}: ${count}`).join(', ')}\n`;
     });
 
-    report += `\nEvening (6:01 PM to 5:59 AM):\n`;
-    eveningData.forEach(data => {
-      report += `URL: ${data.url}, Page Views: ${data.pageviews.length}, Buttons Clicked: ${[...data.buttons.entries()].map(([btn, count]) => `${btn}: ${count}`).join(', ')}\n`;
-    });
-
-    if (!report) {
+    if (!trackingData.length) {
       report = 'No activity recorded in the last 24 hours.';
     }
 
@@ -154,7 +136,7 @@ cron.schedule('0 9 * * *', async () => {
     let mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
-      subject: `Daily Tracking Report for ${domain}`,
+      subject: `Tracking Report for ${domain}`,
       text: report
     };
 
