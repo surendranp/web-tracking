@@ -33,9 +33,17 @@ mongoose.connect(mongoUri)
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Import and use routes
-const pageViews = require('./routes/pageViews');
-app.use('/api/pageviews', pageViews);
+// Reuse or create the Registration model
+let Registration;
+try {
+  Registration = mongoose.model('Registration');
+} catch (error) {
+  const registrationSchema = new mongoose.Schema({
+    domain: String,
+    email: String
+  });
+  Registration = mongoose.model('Registration', registrationSchema);
+}
 
 // Register route for domain and email
 app.post('/api/register', async (req, res) => {
@@ -46,14 +54,8 @@ app.post('/api/register', async (req, res) => {
   }
 
   try {
-    const Registration = mongoose.model('Registration', new mongoose.Schema({
-      domain: String,
-      email: String
-    }));
-
     const registration = new Registration({ domain, email });
     await registration.save();
-
     res.status(200).send('Registration successful.');
   } catch (error) {
     console.error('Error registering domain:', error);
@@ -131,8 +133,6 @@ async function sendTrackingDataToClient(domain, email) {
 
 // Function to send tracking data to all registered clients
 async function sendTrackingDataToAllClients() {
-  const Registration = mongoose.model('Registration');
-
   const registrations = await Registration.find();
 
   registrations.forEach(async (reg) => {
@@ -152,3 +152,4 @@ app.get('/dashboard', (req, res) => {
 });
 
 app.listen(port, () => console.log(`Server running on port ${port}`));
+ 
