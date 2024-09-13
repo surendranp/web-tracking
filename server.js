@@ -35,7 +35,7 @@ const registrationSchema = new mongoose.Schema({
 const Registration = mongoose.model('Registration', registrationSchema);
 
 // Tracking Data Route
-const pageviewsRouter = require('./pageviews');
+const pageviewsRouter = require('./pageviews'); // Ensure pageviews.js exists and is in the correct location
 app.use('/api/pageviews', pageviewsRouter);
 
 // Serve static files from the "public" directory
