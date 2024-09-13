@@ -4,7 +4,6 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
 const nodemailer = require('nodemailer');
-const cron = require('node-cron');
 require('dotenv').config();
 
 const app = express();
@@ -20,6 +19,9 @@ if (!mongoUri) {
   console.error('MongoDB URI is not set.');
   process.exit(1);
 }
+console.log('MongoDB URI:', mongoUri);
+
+// MongoDB Connection
 mongoose.connect(mongoUri)
   .then(() => console.log('MongoDB connected'))
   .catch(err => {
@@ -34,114 +36,66 @@ app.use(express.static(path.join(__dirname, 'public')));
 const pageViews = require('./routes/pageViews');
 app.use('/api/pageviews', pageViews);
 
-// Serve the homepage and dashboard
+const registration = require('./routes/registration');
+app.use('/api/register', registration);
+
+// Serve the dashboard page
 app.get('/dashboard', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/dashboard.html'));
 });
 
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/home.html'));
+// Create a transport for sending emails
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,  // Your email address
+    pass: process.env.EMAIL_PASS   // Your email password or app password
+  }
 });
 
-// Handle domain and email registration
-app.post('/api/register', async (req, res) => {
-  const { domain, email } = req.body;
-  if (!domain || !email) {
-    return res.status(400).send('Domain and email are required');
-  }
-
-  const registrationSchema = new mongoose.Schema({
-    domain: { type: String, required: true },
-    email: { type: String, required: true },
-    createdAt: { type: Date, default: Date.now }
-  });
-  const Registration = mongoose.model('Registration', registrationSchema);
-
+async function sendEmail(to, subject, text) {
   try {
-    const registration = new Registration({ domain, email });
-    await registration.save();
-    res.status(200).send('Registration successful');
-    
-    // Send the tracking script and instructions to the client
-    let transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-      }
-    });
-
-    let mailOptions = {
+    await transporter.sendMail({
       from: process.env.EMAIL_USER,
-      to: email,
-      subject: 'Tracking Script Instructions',
-      text: `Add this script to your website:\n\n<script src="https://your-server-url/tracking.js"></script>`
-    };
-
-    await transporter.sendMail(mailOptions);
+      to,
+      subject,
+      text
+    });
+    console.log(`Email sent to ${to}`);
   } catch (error) {
-    console.error('Error during registration:', error);
-    res.status(500).send('Internal Server Error');
+    console.error('Error sending email:', error.message);
   }
-});
-
-// Function to fetch tracking data from MongoDB
-async function fetchTrackingData(domain) {
-  const sanitizedDomain = domain.replace(/[.\$]/g, '_');
-  const Tracking = mongoose.model(sanitizedDomain);
-
-  // Time periods to fetch the data (last 24 hours)
-  const now = new Date();
-  const startOfDay = new Date(now.setHours(0, 0, 0, 0));
-  const endOfDay = new Date(now.setHours(23, 59, 59, 999));
-
-  // Fetch data for the last 24 hours
-  const trackingData = await Tracking.find({
-    timestamp: { $gte: startOfDay, $lte: endOfDay }
-  });
-
-  return trackingData;
 }
 
-// Cron job to send email with tracking data every minute
-cron.schedule('* * * * *', async () => {
-  const Registration = mongoose.model('Registration');
-  const registrations = await Registration.find();
+// Function to send daily reports
+const sendDailyReports = async () => {
+  const domains = await mongoose.connection.db.listCollections().toArray();
+  for (const domain of domains) {
+    const collection = mongoose.connection.db.collection(domain.name);
+    const todayStart = new Date();
+    todayStart.setHours(6, 0, 0, 0);
+    const todayEnd = new Date(todayStart);
+    todayEnd.setHours(18, 0, 0, 0);
 
-  registrations.forEach(async registration => {
-    const { domain, email } = registration;
+    const yesterdayStart = new Date(todayStart);
+    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
 
-    // Fetch the tracking data
-    const trackingData = await fetchTrackingData(domain);
+    const trackingDataToday = await collection.find({ timestamp: { $gte: todayStart, $lt: todayEnd } }).toArray();
+    const trackingDataYesterday = await collection.find({ timestamp: { $gte: yesterdayStart, $lt: todayStart } }).toArray();
 
-    // Prepare the report
-    let report = `Tracking Report for ${domain}\n\n`;
-    trackingData.forEach(data => {
-      report += `URL: ${data.url}, Page Views: ${data.pageviews.length}, Buttons Clicked: ${[...data.buttons.entries()].map(([btn, count]) => `${btn}: ${count}`).join(', ')}, Links Clicked: ${[...data.links.entries()].map(([link, count]) => `${link}: ${count}`).join(', ')}\n`;
-    });
+    const emailData = `Daily Report for ${domain.name}:\n\n` +
+      `Data from 6:00 AM to 6:00 PM today:\n${JSON.stringify(trackingDataToday, null, 2)}\n\n` +
+      `Data from 6:01 PM to 5:59 AM the following day:\n${JSON.stringify(trackingDataYesterday, null, 2)}`;
 
-    if (!trackingData.length) {
-      report = 'No activity recorded in the last 24 hours.';
+    const client = await collection.findOne({}, { projection: { _id: 0, email: 1 } });
+    if (client && client.email) {
+      await sendEmail(client.email, `Daily Report for ${domain.name}`, emailData);
     }
+  }
+};
 
-    // Send the report via email
-    let transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-      }
-    });
-
-    let mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: email,
-      subject: `Tracking Report for ${domain}`,
-      text: report
-    };
-
-    await transporter.sendMail(mailOptions);
-  });
-});
+// Schedule the daily report
+const schedule = require('node-schedule');
+schedule.scheduleJob('0 0 * * *', sendDailyReports);
 
 app.listen(port, () => console.log(`Server running on port ${port}`));
