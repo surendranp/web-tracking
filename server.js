@@ -1,7 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
-const cors = require('cors');
+const cors = require('cors');  // Ensure CORS is imported
 const path = require('path');
 const nodemailer = require('nodemailer');
 const cron = require('node-cron');
@@ -11,7 +11,7 @@ const app = express();
 const port = process.env.PORT || 8080;
 
 // Middleware
-app.use(cors());
+app.use(cors());  // Enable CORS for all routes
 app.use(bodyParser.json());
 
 // Serve static files like tracking.js from the public directory
