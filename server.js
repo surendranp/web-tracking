@@ -60,6 +60,16 @@ app.post('/api/register', async (req, res) => {
 
 // Send tracking data to email
 async function sendTrackingDataToClient(domain, email) {
+  const collectionName = domain.replace(/[.\$]/g, '_'); // Sanitize domain name
+
+  // Check if the model has already been compiled
+  let Tracking;
+  if (mongoose.models[collectionName]) {
+    Tracking = mongoose.models[collectionName]; // Use the existing model
+  } else {
+    Tracking = mongoose.model(collectionName, new mongoose.Schema({}), collectionName); // Define and use the schema
+  }
+
   const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -67,10 +77,6 @@ async function sendTrackingDataToClient(domain, email) {
       pass: process.env.EMAIL_PASS
     }
   });
-
-  // Fetch tracking data from the MongoDB collection
-  const collectionName = domain.replace(/[.\$]/g, '_'); // Sanitize domain name
-  const Tracking = mongoose.model(collectionName, new mongoose.Schema({})); // Define schema
 
   try {
     const trackingData = await Tracking.find(); // Retrieve all tracking data for the domain
