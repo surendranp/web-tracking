@@ -5,6 +5,4 @@ const registrationSchema = new mongoose.Schema({
   email: String
 });
 
-const Registration = mongoose.model('Registration', registrationSchema);
-
-module.exports = Registration;
+module.exports = mongoose.model('Registration', registrationSchema);

@@ -6,6 +6,7 @@ const path = require('path');
 const nodemailer = require('nodemailer');
 const cron = require('node-cron');
 require('dotenv').config();
+const { Registration } = require('./models'); // Import the model
 
 const app = express();
 const port = process.env.PORT || 8080;
@@ -46,11 +47,6 @@ app.post('/api/register', async (req, res) => {
   }
 
   try {
-    const Registration = mongoose.model('Registration', new mongoose.Schema({
-      domain: String,
-      email: String
-    }));
-
     const registration = new Registration({ domain, email });
     await registration.save();
 
@@ -58,7 +54,7 @@ app.post('/api/register', async (req, res) => {
     res.status(200).send('Registration successful.');
   } catch (error) {
     console.error('Error registering domain:', error);
-    res.status(500).send('Internal Server Error or your domain and email ID allready exist');
+    res.status(500).send('Internal Server Error');
   }
 });
 
@@ -68,7 +64,7 @@ async function sendTrackingDataToClient(domain, email) {
     service: 'gmail',
     auth: {
       user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS 
+      pass: process.env.EMAIL_PASS
     }
   });
 
@@ -107,11 +103,6 @@ async function sendTrackingDataToClient(domain, email) {
 
 // Automatically send tracking data via email for all registered domains
 async function sendTrackingDataToAllClients() {
-  const Registration = mongoose.model('Registration', new mongoose.Schema({
-    domain: String,
-    email: String
-  }));
-
   const registrations = await Registration.find();
 
   registrations.forEach(async (reg) => {
