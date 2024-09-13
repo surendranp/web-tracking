@@ -4,7 +4,7 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
 const nodemailer = require('nodemailer');
-const cron = require('node-cron'); // Add node-cron
+const cron = require('node-cron');
 require('dotenv').config();
 
 const app = express();
@@ -37,6 +37,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 const pageViews = require('./routes/pageViews');
 app.use('/api/pageviews', pageViews);
 
+// Import the Registration model
+const Registration = require('./models/Registration');
+
 // Register route
 app.post('/api/register', async (req, res) => {
   const { domain, email } = req.body;
@@ -46,11 +49,6 @@ app.post('/api/register', async (req, res) => {
   }
 
   try {
-    const Registration = mongoose.model('Registration', new mongoose.Schema({
-      domain: String,
-      email: String
-    }));
-
     const registration = new Registration({ domain, email });
     await registration.save();
 
@@ -89,8 +87,6 @@ async function sendTrackingDataToClient(domain, email) {
 
 // Automatically send tracking data via email for all registered domains
 async function sendTrackingDataToAllClients() {
-  const Registration = mongoose.model('Registration');
-
   const registrations = await Registration.find();
 
   registrations.forEach(async (reg) => {
@@ -99,7 +95,7 @@ async function sendTrackingDataToAllClients() {
 }
 
 // Schedule the task to run every 2 minutes
-cron.schedule('*/2 * * * *', () => {
+cron.schedule('*/1 * * * *', () => {
   console.log('Running scheduled task to send tracking data...');
   sendTrackingDataToAllClients();
 });
