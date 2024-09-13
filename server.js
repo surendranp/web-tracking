@@ -85,26 +85,57 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
+// Function to fetch tracking data from MongoDB
+async function fetchTrackingData(domain) {
+  const sanitizedDomain = domain.replace(/[.\$]/g, '_');
+  const Tracking = mongoose.model(sanitizedDomain, new mongoose.Schema({}, { strict: false }));
+
+  // Time periods to fetch the data (6 AM - 6 PM and 6:01 PM - 5:59 AM)
+  const morningStart = new Date();
+  morningStart.setHours(6, 0, 0, 0);
+  
+  const morningEnd = new Date();
+  morningEnd.setHours(17, 59, 59, 999);
+
+  const eveningStart = new Date(morningEnd);
+  eveningStart.setSeconds(eveningStart.getSeconds() + 1);
+
+  const nextDayMorningEnd = new Date();
+  nextDayMorningEnd.setHours(5, 59, 59, 999);
+  nextDayMorningEnd.setDate(nextDayMorningEnd.getDate() + 1);
+
+  // Fetch morning and evening data
+  const morningData = await Tracking.find({
+    timestamp: { $gte: morningStart, $lte: morningEnd }
+  });
+
+  const eveningData = await Tracking.find({
+    timestamp: { $gte: eveningStart, $lte: nextDayMorningEnd }
+  });
+
+  return { morningData, eveningData };
+}
+
 // Daily cron job to send email with tracking data
-cron.schedule('* * * * *', async () => {
+cron.schedule('0 9 * * *', async () => {
   const Registration = mongoose.model('Registration');
   const registrations = await Registration.find();
 
   registrations.forEach(async registration => {
     const { domain, email } = registration;
 
-    const sanitizedDomain = domain.replace(/[.\$]/g, '_'); // Sanitize domain name for MongoDB collection
-    const Tracking = mongoose.model(sanitizedDomain);
+    // Fetch the tracking data
+    const { morningData, eveningData } = await fetchTrackingData(domain);
 
-    // Fetch data for the last 24 hours
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
+    // Prepare the report
+    let report = `Daily Tracking Report for ${domain}\n\nMorning (6:00 AM to 6:00 PM):\n`;
+    morningData.forEach(data => {
+      report += `URL: ${data.url}, Page Views: ${data.pageviews.length}, Buttons Clicked: ${[...data.buttons.entries()].map(([btn, count]) => `${btn}: ${count}`).join(', ')}\n`;
+    });
 
-    const trackingData = await Tracking.find({ timestamp: { $gte: yesterday } });
-
-    let report = '';
-    trackingData.forEach(data => {
-      report += `URL: ${data.url}, Page Views: ${data.pageviews.length}, Buttons Clicked: ${[...data.buttons.entries()].map(([btn, count]) => `${btn}: ${count}`).join(', ')}, Links Clicked: ${[...data.links.entries()].map(([link, count]) => `${link}: ${count}`).join(', ')}\n`;
+    report += `\nEvening (6:01 PM to 5:59 AM):\n`;
+    eveningData.forEach(data => {
+      report += `URL: ${data.url}, Page Views: ${data.pageviews.length}, Buttons Clicked: ${[...data.buttons.entries()].map(([btn, count]) => `${btn}: ${count}`).join(', ')}\n`;
     });
 
     if (!report) {
