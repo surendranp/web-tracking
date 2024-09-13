@@ -27,9 +27,9 @@ const emailSchema = new mongoose.Schema({
   email: { type: String, required: true },
 });
 
-let Tracking;
 let Email;
 
+// Function to get or create a Tracking model for the domain
 async function getTrackingModel(domain) {
   const collectionName = sanitizeKey(domain);
   try {
@@ -125,14 +125,14 @@ schedule.scheduleJob('* * * * *', async () => {
     const Tracking = await getTrackingModel(domain);
     
     const now = new Date();
-    const sixAmToday = new Date(now.setHours(6, 0, 0, 0));
-    const sixPmToday = new Date(now.setHours(18, 0, 0, 0));
-    const sixPmYesterday = new Date(now.setDate(now.getDate() - 1)).setHours(18, 0, 0, 0);
-
+    const startOfDay = new Date(now.setHours(0, 0, 0, 0));
+    const endOfDay = new Date(now.setHours(23, 59, 59, 999));
+    
+    // Retrieve tracking data from today
     const data = await Tracking.find({
       timestamp: {
-        $gte: sixPmYesterday,
-        $lt: sixPmToday
+        $gte: startOfDay,
+        $lt: endOfDay
       }
     });
 

@@ -40,7 +40,7 @@ app.get('/dashboard', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/dashboard.html'));
 });
 
-// Add route to handle client registration
+// Route to handle client registration
 app.post('/api/register', async (req, res) => {
   const { domain, email } = req.body;
 
