@@ -3,8 +3,8 @@ const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
-const nodemailer = require('nodemailer');  // For email functionality
-const cron = require('node-cron'); // For scheduling daily email reports
+const nodemailer = require('nodemailer');
+const cron = require('node-cron');
 require('dotenv').config();
 
 const app = express();
@@ -20,9 +20,6 @@ if (!mongoUri) {
   console.error('MongoDB URI is not set.');
   process.exit(1);
 }
-console.log('MongoDB URI:', mongoUri);
-
-// MongoDB Connection
 mongoose.connect(mongoUri)
   .then(() => console.log('MongoDB connected'))
   .catch(err => {
@@ -37,12 +34,11 @@ app.use(express.static(path.join(__dirname, 'public')));
 const pageViews = require('./routes/pageViews');
 app.use('/api/pageviews', pageViews);
 
-// Serve the dashboard page
+// Serve the homepage and dashboard
 app.get('/dashboard', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/dashboard.html'));
 });
 
-// Serve the homepage
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/home.html'));
 });
@@ -50,18 +46,15 @@ app.get('/', (req, res) => {
 // Handle domain and email registration
 app.post('/api/register', async (req, res) => {
   const { domain, email } = req.body;
-
   if (!domain || !email) {
     return res.status(400).send('Domain and email are required');
   }
 
-  // Save the domain and email to MongoDB (create schema and model)
   const registrationSchema = new mongoose.Schema({
     domain: { type: String, required: true },
     email: { type: String, required: true },
     createdAt: { type: Date, default: Date.now }
   });
-
   const Registration = mongoose.model('Registration', registrationSchema);
 
   try {
@@ -69,7 +62,7 @@ app.post('/api/register', async (req, res) => {
     await registration.save();
     res.status(200).send('Registration successful');
     
-    // Send email with tracking script instructions
+    // Send the tracking script and instructions to the client
     let transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
@@ -82,7 +75,7 @@ app.post('/api/register', async (req, res) => {
       from: process.env.EMAIL_USER,
       to: email,
       subject: 'Tracking Script Instructions',
-      text: `Thank you for registering your domain. Please add the following script to the <head> section of your website:\n\n<script src="https://web-tracking-mongodburi.up.railway.app/tracking.js"></script>`
+      text: `Add this script to your website:\n\n<script src="https://your-server-url/tracking.js"></script>`
     };
 
     await transporter.sendMail(mailOptions);
@@ -92,7 +85,7 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// Daily email cron job to send tracking data
+// Daily cron job to send email with tracking data
 cron.schedule('* * * * *', async () => {
   const Registration = mongoose.model('Registration');
   const registrations = await Registration.find();
@@ -100,34 +93,25 @@ cron.schedule('* * * * *', async () => {
   registrations.forEach(async registration => {
     const { domain, email } = registration;
 
-    // Fetch tracking data for the current domain
-    const collectionName = domain.replace(/[.\$]/g, '_'); // Sanitize domain name
-    let Tracking;
-    
-    try {
-      Tracking = mongoose.model(collectionName);
-    } catch (error) {
-      console.error(`No collection found for domain: ${domain}`);
-      return;
+    const sanitizedDomain = domain.replace(/[.\$]/g, '_'); // Sanitize domain name for MongoDB collection
+    const Tracking = mongoose.model(sanitizedDomain);
+
+    // Fetch data for the last 24 hours
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const trackingData = await Tracking.find({ timestamp: { $gte: yesterday } });
+
+    let report = '';
+    trackingData.forEach(data => {
+      report += `URL: ${data.url}, Page Views: ${data.pageviews.length}, Buttons Clicked: ${[...data.buttons.entries()].map(([btn, count]) => `${btn}: ${count}`).join(', ')}, Links Clicked: ${[...data.links.entries()].map(([link, count]) => `${link}: ${count}`).join(', ')}\n`;
+    });
+
+    if (!report) {
+      report = 'No activity recorded in the last 24 hours.';
     }
 
-    // Fetch tracking data for the past day (last 24 hours)
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 1);
-    
-    const dailyData = await Tracking.find({ timestamp: { $gte: startDate } });
-
-    // Compile tracking data summary
-    let dataSummary;
-    if (dailyData.length > 0) {
-      dataSummary = dailyData.map(entry => {
-        return `URL: ${entry.url}, Page Views: ${entry.pageviews.length}, Buttons Clicked: ${entry.buttonClicks.length}, Links Clicked: ${entry.navLinkClicks.length}`;
-      }).join('\n');
-    } else {
-      dataSummary = 'No activity recorded in the last 24 hours.';
-    }
-
-    // Send email with the tracking data summary
+    // Send the report via email
     let transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
@@ -140,7 +124,7 @@ cron.schedule('* * * * *', async () => {
       from: process.env.EMAIL_USER,
       to: email,
       subject: `Daily Tracking Report for ${domain}`,
-      text: `Here is your daily tracking report for ${domain}:\n\n${dataSummary}`
+      text: report
     };
 
     await transporter.sendMail(mailOptions);
