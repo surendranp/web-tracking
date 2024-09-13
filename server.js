@@ -3,7 +3,6 @@ const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
-const nodemailer = require('nodemailer');
 require('dotenv').config();
 
 const app = express();
@@ -29,6 +28,14 @@ mongoose.connect(mongoUri)
     process.exit(1);
   });
 
+// Define the schema and model for storing domain and email
+const registrationSchema = new mongoose.Schema({
+  domain: { type: String, required: true },
+  email: { type: String, required: true }
+});
+
+const Registration = mongoose.model('Registration', registrationSchema);
+
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -36,66 +43,27 @@ app.use(express.static(path.join(__dirname, 'public')));
 const pageViews = require('./routes/pageViews');
 app.use('/api/pageviews', pageViews);
 
-const registration = require('./routes/registration');
-app.use('/api/register', registration);
+// Register endpoint
+app.post('/api/register', async (req, res) => {
+  try {
+    const { domain, email } = req.body;
+    if (!domain || !email) {
+      return res.status(400).send('Missing required fields');
+    }
+
+    const newRegistration = new Registration({ domain, email });
+    await newRegistration.save();
+
+    res.status(200).send('Registration successful');
+  } catch (error) {
+    console.error('Error registering domain and email:', error.message);
+    res.status(500).send('Internal Server Error');
+  }
+});
 
 // Serve the dashboard page
 app.get('/dashboard', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/dashboard.html'));
 });
-
-// Create a transport for sending emails
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,  // Your email address
-    pass: process.env.EMAIL_PASS   // Your email password or app password
-  }
-});
-
-async function sendEmail(to, subject, text) {
-  try {
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to,
-      subject,
-      text
-    });
-    console.log(`Email sent to ${to}`);
-  } catch (error) {
-    console.error('Error sending email:', error.message);
-  }
-}
-
-// Function to send daily reports
-const sendDailyReports = async () => {
-  const domains = await mongoose.connection.db.listCollections().toArray();
-  for (const domain of domains) {
-    const collection = mongoose.connection.db.collection(domain.name);
-    const todayStart = new Date();
-    todayStart.setHours(6, 0, 0, 0);
-    const todayEnd = new Date(todayStart);
-    todayEnd.setHours(18, 0, 0, 0);
-
-    const yesterdayStart = new Date(todayStart);
-    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
-
-    const trackingDataToday = await collection.find({ timestamp: { $gte: todayStart, $lt: todayEnd } }).toArray();
-    const trackingDataYesterday = await collection.find({ timestamp: { $gte: yesterdayStart, $lt: todayStart } }).toArray();
-
-    const emailData = `Daily Report for ${domain.name}:\n\n` +
-      `Data from 6:00 AM to 6:00 PM today:\n${JSON.stringify(trackingDataToday, null, 2)}\n\n` +
-      `Data from 6:01 PM to 5:59 AM the following day:\n${JSON.stringify(trackingDataYesterday, null, 2)}`;
-
-    const client = await collection.findOne({}, { projection: { _id: 0, email: 1 } });
-    if (client && client.email) {
-      await sendEmail(client.email, `Daily Report for ${domain.name}`, emailData);
-    }
-  }
-};
-
-// Schedule the daily report
-const schedule = require('node-schedule');
-schedule.scheduleJob('0 0 * * *', sendDailyReports);
 
 app.listen(port, () => console.log(`Server running on port ${port}`));
