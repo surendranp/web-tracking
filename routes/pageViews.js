@@ -34,7 +34,7 @@ router.post('/', async (req, res) => {
     });
 
     let Tracking;
-    
+
     // Check if model is already defined
     if (mongoose.models[collectionName]) {
       Tracking = mongoose.models[collectionName];

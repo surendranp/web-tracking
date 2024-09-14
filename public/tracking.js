@@ -29,6 +29,10 @@
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(data)
+    }).then(response => {
+      if (!response.ok) {
+        console.error('Failed to send tracking data:', response.statusText);
+      }
     }).catch(err => console.error('Error sending tracking data:', err));
   }
 
