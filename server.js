@@ -55,7 +55,6 @@ app.post('/api/register', async (req, res) => {
     const registration = new Registration({ domain, email });
     await registration.save();
 
-    // Create a schema and model for the domain's tracking data if it doesn't already exist
     const collectionName = sanitizeDomain(domain);
     if (!mongoose.models[collectionName]) {
       const trackingSchema = new mongoose.Schema({
@@ -92,7 +91,6 @@ app.post('/api/pageviews', async (req, res) => {
   try {
     const collectionName = sanitizeDomain(domain);
 
-    // Ensure the collection is created if it doesn't exist yet
     let Tracking;
     if (mongoose.models[collectionName]) {
       Tracking = mongoose.model(collectionName);
@@ -102,7 +100,7 @@ app.post('/api/pageviews', async (req, res) => {
         type: String,
         ip: String,
         sessionId: String,
-        timestamp: { type: Date, default: Date.now }, // Ensure default timestamp is set
+        timestamp: { type: Date, default: Date.now },
         buttons: { type: Map, of: Number, default: {} },
         links: { type: Map, of: Number, default: {} },
         pageviews: [String],
@@ -110,21 +108,17 @@ app.post('/api/pageviews', async (req, res) => {
       Tracking = mongoose.model(collectionName, trackingSchema, collectionName);
     }
 
-    // Find or create a document for the current session and IP
     let trackingData = await Tracking.findOne({ ip, sessionId });
 
     if (!trackingData) {
-      // Create new document if none exists
       trackingData = new Tracking({
         url,
         type,
         ip,
         sessionId,
         pageviews: type === 'pageview' ? [url] : [],
-        timestamp: Date.now(), // Ensure timestamp is saved when the record is created
       });
     } else {
-      // Update existing document based on event type
       if (type === 'pageview') {
         if (!trackingData.pageviews.includes(url)) {
           trackingData.pageviews.push(url);
@@ -138,10 +132,6 @@ app.post('/api/pageviews', async (req, res) => {
       }
     }
 
-    // Log the updated data for debugging
-    console.log("Updated tracking data:", trackingData);
-
-    // Save updated tracking data
     await trackingData.save();
 
     res.status(200).send('Tracking data stored successfully');
@@ -164,7 +154,7 @@ async function sendTrackingDataToClient(domain, email) {
       type: String,
       ip: String,
       sessionId: String,
-      timestamp: { type: Date, default: Date.now },
+      timestamp: Date,
       buttons: { type: Map, of: Number, default: {} },
       links: { type: Map, of: Number, default: {} },
       pageviews: [String],
@@ -195,19 +185,15 @@ async function sendTrackingDataToClient(domain, email) {
       dataText += `IP: ${doc.ip}\n`;
       dataText += `Session ID: ${doc.sessionId}\n`;
 
-      // Ensure valid timestamp is used
       const timestamp = doc.timestamp ? new Date(doc.timestamp).toLocaleString() : 'No valid timestamp available';
       dataText += `Timestamp: ${timestamp}\n`;
 
-      // Pageviews
       dataText += `Pageviews: ${doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews'}\n`;
 
-      // Convert and log buttons
-      const buttonsObject = Object.fromEntries(doc.buttons || []);
-      dataText += `Buttons Clicked: ${Object.keys(buttonsObject).length > 0 ? JSON.stringify(buttonsObject) : 'No button clicks'}\n`;
+      const buttonsObject = doc.buttons ? Object.fromEntries(doc.buttons.entries()) : {};
+      const linksObject = doc.links ? Object.fromEntries(doc.links.entries()) : {};
 
-      // Convert and log links
-      const linksObject = Object.fromEntries(doc.links || []);
+      dataText += `Buttons Clicked: ${Object.keys(buttonsObject).length > 0 ? JSON.stringify(buttonsObject) : 'No button clicks'}\n`;
       dataText += `Links Clicked: ${Object.keys(linksObject).length > 0 ? JSON.stringify(linksObject) : 'No link clicks'}\n\n`;
     });
 
@@ -225,7 +211,6 @@ async function sendTrackingDataToClient(domain, email) {
   }
 }
 
-
 // Function to send tracking data to all registered clients
 async function sendTrackingDataToAllClients() {
   const registrations = await Registration.find();
@@ -236,7 +221,7 @@ async function sendTrackingDataToAllClients() {
 }
 
 // Schedule the task to run every day at 9 AM
-cron.schedule('* * * * *', async () => {
+cron.schedule('0 9 * * *', async () => {
   console.log('Running scheduled task to send tracking data...');
   await sendTrackingDataToAllClients();
 });
