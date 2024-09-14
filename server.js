@@ -33,9 +33,10 @@ mongoose.connect(mongoUri)
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Import and use routes
-const pageViews = require('./routes/pageViews');
-app.use('/api/pageviews', pageViews);
+// Function to sanitize the domain to be used as a collection name
+function sanitizeDomain(domain) {
+  return domain.replace(/[.\$\/:]/g, '_');
+}
 
 // Register route for domain and email
 app.post('/api/register', async (req, res) => {
@@ -55,7 +56,7 @@ app.post('/api/register', async (req, res) => {
     await registration.save();
 
     // Create a schema and model for the domain's tracking data if it doesn't already exist
-    const collectionName = domain.replace(/[.\$]/g, '_');
+    const collectionName = sanitizeDomain(domain);
     if (!mongoose.models[collectionName]) {
       const trackingSchema = new mongoose.Schema({
         url: String,
@@ -79,7 +80,7 @@ app.post('/api/register', async (req, res) => {
 
 // Function to send tracking data to the client via email
 async function sendTrackingDataToClient(domain, email) {
-  const collectionName = domain.replace(/[.\$]/g, '_'); // Sanitize domain name
+  const collectionName = sanitizeDomain(domain); // Sanitize domain name
 
   // Check if the model already exists and reuse it if it does
   let Tracking;
@@ -144,7 +145,6 @@ async function sendTrackingDataToClient(domain, email) {
     console.error('Error sending email:', error);
   }
 }
-
 
 // Function to send tracking data to all registered clients
 async function sendTrackingDataToAllClients() {
