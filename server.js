@@ -40,7 +40,6 @@ const RegistrationSchema = new mongoose.Schema({
   domain: { type: String, required: true, unique: true },
   email: { type: String, required: true }
 });
-
 const Registration = mongoose.models.Registration || mongoose.model('Registration', RegistrationSchema);
 
 // Register route for domain and email
@@ -63,7 +62,7 @@ app.post('/api/register', async (req, res) => {
         type: String,
         ip: String,
         sessionId: String,
-        timestamp: Date,
+        timestamp: { type: Date, default: Date.now },
         buttons: Object,
         links: Object
       });
@@ -92,10 +91,8 @@ app.post('/api/pageviews', async (req, res) => {
     const collectionName = sanitizeDomain(domain);
 
     // Ensure the collection is created if it doesn't exist yet
-    let Tracking;
-    if (mongoose.models[collectionName]) {
-      Tracking = mongoose.model(collectionName);
-    } else {
+    let Tracking = mongoose.models[collectionName];
+    if (!Tracking) {
       const trackingSchema = new mongoose.Schema({
         url: String,
         type: String,
@@ -131,10 +128,8 @@ async function sendTrackingDataToClient(domain, email) {
   const collectionName = sanitizeDomain(domain); // Sanitize domain name
 
   // Reuse existing model or create a new one if necessary
-  let Tracking;
-  if (mongoose.models[collectionName]) {
-    Tracking = mongoose.model(collectionName);
-  } else {
+  let Tracking = mongoose.models[collectionName];
+  if (!Tracking) {
     const trackingSchema = new mongoose.Schema({
       url: String,
       type: String,
@@ -201,7 +196,7 @@ async function sendTrackingDataToAllClients() {
 }
 
 // Schedule the task to run every 2 minutes
-cron.schedule('* * * * *', async () => {
+cron.schedule('*/2 * * * *', async () => {
   console.log('Running scheduled task to send tracking data...');
   await sendTrackingDataToAllClients();
 });
@@ -219,9 +214,4 @@ app.get('/tracking.js', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/tracking.js')); 
 });
 
-app.get('/tracking.js', (req, res) => {
-  res.sendFile(path.join(__dirname, 'routes/pageViews.js')); 
-});
-
 app.listen(port, () => console.log(`Server running on port ${port}`));
-
