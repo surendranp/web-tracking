@@ -1,67 +1,72 @@
 (function() {
-  function getTrackingData() {
-    return {
-      type: document.querySelector('meta[name="tracking-type"]')?.getAttribute('content') || '',
-      buttonName: document.querySelector('meta[name="button-name"]')?.getAttribute('content') || '',
-      linkName: document.querySelector('meta[name="link-name"]')?.getAttribute('content') || '',
-      url: window.location.href,
-      ip: '', // Implement a method to fetch IP if required
-      sessionId: getSessionId(),
-      domain: window.location.hostname // Captures the domain name including subdomains
-    };
-  }
+  const trackingUrl = 'https://web-tracking-mongodburi.up.railway.app/api/pageviews'; // Replace with your actual API URL
 
-  function getSessionId() {
-    let sessionId = sessionStorage.getItem('sessionId');
-    if (!sessionId) {
-      sessionId = Date.now().toString(); // Generate a new session ID if not present
-      sessionStorage.setItem('sessionId', sessionId);
+  async function getUserIP() {
+    try {
+      const response = await fetch('https://api.ipify.org?format=json');
+      const data = await response.json();
+      return data.ip;
+    } catch (error) {
+      console.error('Error fetching IP address:', error.message);
+      return 'unknown';
     }
-    return sessionId;
   }
 
-  function sendTrackingData(data) {
-    console.log('Sending tracking data:', data); // Debug log
+  function generateSessionId() {
+    return Math.random().toString(36).substr(2, 9);
+  }
 
-    fetch('https://web-tracking-mongodburi.up.railway.app/api/pageviews', {
+  async function sendTrackingData(data) {
+    const ip = await getUserIP();
+    const domain = window.location.hostname;  // Capture the domain name
+    fetch(trackingUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(data)
-    }).then(response => {
-      if (!response.ok) {
-        console.error('Failed to send tracking data:', response.statusText);
-      }
-    }).catch(err => console.error('Error sending tracking data:', err));
+      body: JSON.stringify({ ...data, ip, domain })  // Send the domain name to the server
+    }).catch(error => console.error('Error sending tracking data:', error.message));
   }
 
-  function trackButtonClicks() {
-    document.addEventListener('click', function(event) {
-      if (event.target.tagName === 'BUTTON') {
-        const data = getTrackingData();
-        data.type = 'button_click';
-        data.buttonName = event.target.innerText || 'Unnamed Button';
-        sendTrackingData(data);
-      }
+  let sessionId = localStorage.getItem('sessionId') || generateSessionId();
+  localStorage.setItem('sessionId', sessionId);
+
+  // Track page view
+  function trackPageView() {
+    sendTrackingData({
+      type: 'pageview',
+      url: window.location.href,
+      timestamp: new Date().toISOString(),
+      sessionId
     });
   }
 
-  function trackLinkClicks() {
-    document.addEventListener('click', function(event) {
-      if (event.target.tagName === 'A') {
-        const data = getTrackingData();
-        data.type = 'link_click';
-        data.linkName = event.target.href || 'Unnamed Link';
-        sendTrackingData(data);
-      }
-    });
-  }
+  trackPageView(); // Initial page view tracking
 
-  function initTracking() {
-    trackButtonClicks();
-    trackLinkClicks();
-  }
+  // Track click events
+  document.addEventListener('click', function(event) {
+    let elementName = 'Unnamed Element';
 
-  document.addEventListener('DOMContentLoaded', initTracking);
+    if (event.target.tagName === 'BUTTON') {
+      elementName = event.target.innerText || event.target.id || 'Unnamed Button';
+      sendTrackingData({
+        type: 'button_click',
+        buttonName: elementName,
+        url: window.location.href,
+        timestamp: new Date().toISOString(),
+        sessionId
+      });
+    }
+
+    if (event.target.tagName === 'A') {
+      elementName = event.target.href || 'Unnamed Link';
+      sendTrackingData({
+        type: 'link_click',
+        linkName: elementName,
+        url: window.location.href,
+        timestamp: new Date().toISOString(),
+        sessionId
+      });
+    }
+  });
 })();

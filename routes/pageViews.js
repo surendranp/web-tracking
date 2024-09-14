@@ -1,82 +1,83 @@
 const express = require('express');
-const mongoose = require('mongoose');
 const router = express.Router();
+const mongoose = require('mongoose');
 
 // Sanitize keys for safe storage in MongoDB
 function sanitizeKey(key) {
   return key.replace(/[.\$]/g, '_');
 }
 
-// Define the schema for tracking data
-const trackingSchema = new mongoose.Schema({
-  type: { type: String, required: true },
-  url: { type: String, required: true },
-  buttons: { type: Map, of: Number, default: {} },
-  links: { type: Map, of: Number, default: {} },
-  pageviews: [String],
-  timestamp: { type: Date, default: Date.now },
-  ip: { type: String, default: '' },
-  sessionId: { type: String, default: '' },
-  duration: Number,
-});
-
-// Handle POST requests for tracking data
+// POST route to collect tracking data
 router.post('/', async (req, res) => {
   try {
     const { type, buttonName, linkName, url, ip, sessionId, domain } = req.body;
 
-    // Check for required fields
-    if (!type || !url || !domain) {
+    if (!type || !url || !ip || !sessionId || !domain) {
       console.error('Error: Missing required fields');
-      console.error('Received data:', req.body);
       return res.status(400).send('Missing required fields');
     }
 
     // Create a dynamic collection name based on the domain
-    const collectionName = sanitizeKey(domain);
+    const collectionName = sanitizeKey(domain); // Sanitize the domain name
+    const trackingSchema = new mongoose.Schema({
+      type: { type: String, required: true },
+      url: { type: String, required: true },
+      buttons: { type: Map, of: Number, default: {} },  // Store button click counts
+      links: { type: Map, of: Number, default: {} },    // Store link click counts
+      pageviews: [String],                              // Track navigation flow
+      timestamp: { type: Date, default: Date.now },
+      ip: { type: String, required: true },
+      sessionId: String,
+      duration: Number,
+    });
 
-    // Check if model is already defined
     let Tracking;
-    if (mongoose.models[collectionName]) {
-      Tracking = mongoose.models[collectionName];
-    } else {
-      Tracking = mongoose.model(collectionName, trackingSchema, collectionName);
+
+    try {
+      Tracking = mongoose.model(collectionName);
+    } catch (error) {
+      Tracking = mongoose.model(collectionName, trackingSchema, collectionName); // Define model only if it does not already exist
     }
 
-    // Find or create tracking data document
+    // Find the document by IP and sessionId
     let trackingData = await Tracking.findOne({ ip, sessionId });
 
     if (!trackingData) {
+      // Create a new document if none exists
       trackingData = new Tracking({
         type,
         url,
         ip,
         sessionId,
-        pageviews: [url]
+        pageviews: [url] // Track the first pageview
       });
     }
 
-    // Update tracking data
+    // Update pageviews for navigation flow
     if (type === 'pageview') {
       if (!trackingData.pageviews.includes(url)) {
         trackingData.pageviews.push(url);
       }
     }
 
+    // Track button clicks
     if (type === 'button_click') {
       const sanitizedButtonName = sanitizeKey(buttonName || '');
       trackingData.buttons.set(sanitizedButtonName, (trackingData.buttons.get(sanitizedButtonName) || 0) + 1);
     }
 
+    // Track link clicks
     if (type === 'link_click') {
       const sanitizedLinkName = sanitizeKey(linkName || '');
       trackingData.links.set(sanitizedLinkName, (trackingData.links.get(sanitizedLinkName) || 0) + 1);
     }
 
+    // Save updated tracking data
     await trackingData.save();
+
     res.status(200).send('Data received');
   } catch (error) {
-    console.error('Error saving tracking data:', error.message);
+    console.error('Error saving tracking data:', error.message, error);
     res.status(500).send('Internal Server Error');
   }
 });

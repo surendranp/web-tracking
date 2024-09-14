@@ -37,55 +37,26 @@ app.use(express.static(path.join(__dirname, 'public')));
 const pageViews = require('./routes/pageViews');
 app.use('/api/pageviews', pageViews);
 
-// Register route for domain and email
-app.post('/api/register', async (req, res) => {
-  const { domain, email } = req.body;
-
-  if (!domain || !email) {
-    return res.status(400).send('Domain and email are required.');
-  }
-
-  try {
-    const Registration = mongoose.model('Registration', new mongoose.Schema({
-      domain: String,
-      email: String
-    }));
-
-    const registration = new Registration({ domain, email });
-    await registration.save();
-
-    res.status(200).send('Registration successful.');
-  } catch (error) {
-    console.error('Error registering domain:', error);
-    res.status(500).send('Internal Server Error');
-  }
-});
-
-// Cache models to avoid redefinition errors
-const modelsCache = {};
-
-// Function to get or create a model dynamically
-function getOrCreateTrackingModel(collectionName) {
-  if (!modelsCache[collectionName]) {
-    const trackingSchema = new mongoose.Schema({
-      url: String,
-      type: String,
-      ip: String,
-      sessionId: String,
-      timestamp: Date,
-      buttons: Object,
-      links: Object
-    });
-
-    modelsCache[collectionName] = mongoose.model(collectionName, trackingSchema, collectionName);
-  }
-  return modelsCache[collectionName];
-}
+const registration = require('./routes/registration');
+app.use('/api/register', registration);
 
 // Function to send tracking data to the client via email
 async function sendTrackingDataToClient(domain, email) {
   const collectionName = domain.replace(/[.\$]/g, '_'); // Sanitize domain name
-  const Tracking = getOrCreateTrackingModel(collectionName);
+
+  // Define the schema based on tracking data structure
+  const trackingSchema = new mongoose.Schema({
+    url: String,
+    type: String,
+    ip: String,
+    sessionId: String,
+    timestamp: Date,
+    buttons: Object,
+    links: Object
+  });
+
+  // Create the model dynamically using the collectionName
+  const Tracking = mongoose.model(collectionName, trackingSchema, collectionName);
 
   const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -133,17 +104,13 @@ async function sendTrackingDataToClient(domain, email) {
 
 // Function to send tracking data to all registered clients
 async function sendTrackingDataToAllClients() {
-  const Registration = mongoose.model('Registration');
+  const Client = mongoose.model('Client');
 
-  const registrations = await Registration.find();
+  const clients = await Client.find();
 
-  for (const reg of registrations) {
-    try {
-      await sendTrackingDataToClient(reg.domain, reg.email);
-    } catch (error) {
-      console.error(`Error sending data to ${reg.email}:`, error);
-    }
-  }
+  clients.forEach(async (client) => {
+    await sendTrackingDataToClient(client.domain, client.email);
+  });
 }
 
 // Schedule the task to run every 2 minutes
