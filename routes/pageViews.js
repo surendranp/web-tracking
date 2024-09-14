@@ -51,21 +51,21 @@ router.post('/', async (req, res) => {
         url,
         ip,
         sessionId,
-        pageviews: [url]
+        pageviews: type === 'pageview' ? [url] : []
       });
-    }
-
-    // Update data based on the event type
-    if (type === 'pageview') {
-      if (!trackingData.pageviews.includes(url)) {
-        trackingData.pageviews.push(url);
+    } else {
+      // Update existing document based on event type
+      if (type === 'pageview') {
+        if (!trackingData.pageviews.includes(url)) {
+          trackingData.pageviews.push(url);
+        }
+      } else if (type === 'button_click') {
+        const sanitizedButtonName = buttonName ? buttonName.replace(/[.\$]/g, '_') : 'Unnamed Button';
+        trackingData.buttons.set(sanitizedButtonName, (trackingData.buttons.get(sanitizedButtonName) || 0) + 1);
+      } else if (type === 'link_click') {
+        const sanitizedLinkName = linkName ? linkName.replace(/[.\$]/g, '_') : 'Unnamed Link';
+        trackingData.links.set(sanitizedLinkName, (trackingData.links.get(sanitizedLinkName) || 0) + 1);
       }
-    } else if (type === 'button_click') {
-      const sanitizedButtonName = buttonName ? buttonName.replace(/[.\$]/g, '_') : 'Unnamed Button';
-      trackingData.buttons.set(sanitizedButtonName, (trackingData.buttons.get(sanitizedButtonName) || 0) + 1);
-    } else if (type === 'link_click') {
-      const sanitizedLinkName = linkName ? linkName.replace(/[.\$]/g, '_') : 'Unnamed Link';
-      trackingData.links.set(sanitizedLinkName, (trackingData.links.get(sanitizedLinkName) || 0) + 1);
     }
 
     // Save updated tracking data
