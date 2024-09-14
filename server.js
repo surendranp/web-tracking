@@ -218,8 +218,8 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/home.html'));
 });
 
-// app.get('/tracking.js', (req, res) => {
-//   res.sendFile(path.join(__dirname, 'public/tracking.js')); 
-// });
+app.get('/tracking.js', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/tracking.js')); 
+});
 
 app.listen(port, () => console.log(`Server running on port ${port}`));
