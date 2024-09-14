@@ -4,8 +4,8 @@
       type: document.querySelector('meta[name="tracking-type"]')?.getAttribute('content') || '',
       buttonName: document.querySelector('meta[name="button-name"]')?.getAttribute('content') || '',
       linkName: document.querySelector('meta[name="link-name"]')?.getAttribute('content') || '',
-      url: window.location.href.replace(/;$/, ''), // Remove trailing semicolon if present
-      ip: '', // IP needs to be handled server-side
+      url: window.location.href,
+      ip: '', // Implement a method to fetch IP if required
       sessionId: getSessionId(),
       domain: window.location.hostname // Captures the domain name including subdomains
     };
