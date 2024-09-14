@@ -190,9 +190,9 @@ async function sendTrackingDataToClient(domain, email) {
 
       dataText += `Pageviews: ${doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews'}\n`;
 
-      // Convert Map to Object
-      const buttonsObject = doc.buttons ? Object.fromEntries(doc.buttons.entries()) : {};
-      const linksObject = doc.links ? Object.fromEntries(doc.links.entries()) : {};
+      // Convert plain objects (buttons and links)
+      const buttonsObject = doc.buttons || {};
+      const linksObject = doc.links || {};
 
       dataText += `Buttons Clicked: ${Object.keys(buttonsObject).length > 0 ? JSON.stringify(buttonsObject) : 'No button clicks'}\n`;
       dataText += `Links Clicked: ${Object.keys(linksObject).length > 0 ? JSON.stringify(linksObject) : 'No link clicks'}\n\n`;
