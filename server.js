@@ -61,16 +61,12 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// Function to send tracking data to the client via email
-async function sendTrackingDataToClient(domain, email) {
-  const collectionName = domain.replace(/[.\$]/g, '_'); // Sanitize domain name
+// Cache models to avoid redefinition errors
+const modelsCache = {};
 
-  // Check if the model has already been compiled
-  let Tracking;
-  if (mongoose.models[collectionName]) {
-    Tracking = mongoose.models[collectionName]; // Use existing model
-  } else {
-    // Define the schema based on tracking data structure
+// Function to get or create a model dynamically
+function getOrCreateTrackingModel(collectionName) {
+  if (!modelsCache[collectionName]) {
     const trackingSchema = new mongoose.Schema({
       url: String,
       type: String,
@@ -81,9 +77,15 @@ async function sendTrackingDataToClient(domain, email) {
       links: Object
     });
 
-    // Create the model dynamically using the collectionName
-    Tracking = mongoose.model(collectionName, trackingSchema, collectionName);
+    modelsCache[collectionName] = mongoose.model(collectionName, trackingSchema, collectionName);
   }
+  return modelsCache[collectionName];
+}
+
+// Function to send tracking data to the client via email
+async function sendTrackingDataToClient(domain, email) {
+  const collectionName = domain.replace(/[.\$]/g, '_'); // Sanitize domain name
+  const Tracking = getOrCreateTrackingModel(collectionName);
 
   const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -135,9 +137,13 @@ async function sendTrackingDataToAllClients() {
 
   const registrations = await Registration.find();
 
-  registrations.forEach(async (reg) => {
-    await sendTrackingDataToClient(reg.domain, reg.email);
-  });
+  for (const reg of registrations) {
+    try {
+      await sendTrackingDataToClient(reg.domain, reg.email);
+    } catch (error) {
+      console.error(`Error sending data to ${reg.email}:`, error);
+    }
+  }
 }
 
 // Schedule the task to run every 2 minutes
