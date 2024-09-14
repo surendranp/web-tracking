@@ -17,15 +17,16 @@ router.post('/', async (req, res) => {
       return res.status(400).send('Missing required fields');
     }
 
-    // Create a dynamic collection name based on the domain
-    const collectionName = sanitizeKey(domain); // Sanitize the domain name
-    let Tracking;
+    // Sanitize domain to ensure consistency
+    const sanitizedDomain = sanitizeKey(domain); // Sanitize the domain name
 
-    // Check if the model exists before creating it
-    if (mongoose.models[collectionName]) {
-      Tracking = mongoose.model(collectionName); // Reuse the existing model
-    } else {
-      // Define the schema if the model doesn't exist
+    // Check if the collection for the domain exists
+    let Tracking;
+    try {
+      // Check if the collection model is already compiled
+      Tracking = mongoose.model(sanitizedDomain);  // This will throw if the model doesn't exist yet
+    } catch (error) {
+      // If the model doesn't exist, create it (server should have already created this)
       const trackingSchema = new mongoose.Schema({
         type: { type: String, required: true },
         url: { type: String, required: true },
@@ -38,7 +39,8 @@ router.post('/', async (req, res) => {
         duration: Number,
       });
 
-      Tracking = mongoose.model(collectionName, trackingSchema); // Create the model
+      // Create the model dynamically using the sanitized domain
+      Tracking = mongoose.model(sanitizedDomain, trackingSchema, sanitizedDomain);
     }
 
     // Find the document by IP and sessionId
