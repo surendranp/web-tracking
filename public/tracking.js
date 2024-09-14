@@ -1,5 +1,5 @@
 (function() {
-  const trackingUrl = 'https://web-tracking-mongodburi.up.railway.app/api/pageviews'; // Replace with your actual API URL
+  const trackingUrl = 'https://web-tracking-mongodburi.up.railway.app/api/pageviews';  // Replace with your actual API URL
 
   async function getUserIP() {
     try {
@@ -18,13 +18,12 @@
 
   async function sendTrackingData(data) {
     const ip = await getUserIP();
-    const domain = window.location.hostname;  // Capture the domain name
     fetch(trackingUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ ...data, ip, domain })  // Send the domain name to the server
+      body: JSON.stringify({ ...data, ip })
     }).catch(error => console.error('Error sending tracking data:', error.message));
   }
 
