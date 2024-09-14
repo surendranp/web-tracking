@@ -14,6 +14,7 @@ router.post('/', async (req, res) => {
 
     if (!type || !url || !ip || !sessionId || !domain) {
       console.error('Error: Missing required fields');
+      console.error('Received data:', req.body); // Log the received data
       return res.status(400).send('Missing required fields');
     }
 
