@@ -195,28 +195,22 @@ async function sendTrackingDataToClient(domain, email) {
       dataText += `IP: ${doc.ip}\n`;
       dataText += `Session ID: ${doc.sessionId}\n`;
       dataText += `Timestamp: ${new Date(doc.timestamp).toLocaleString()}\n`;
-      dataText += `Pageviews: ${doc.pageviews.join(', ')}\n`;
+      dataText += `Pageviews: ${doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews'}\n`;
 
       // Check and format buttons
-      if (doc.buttons instanceof Map) {
-        const buttonsObject = {};
-        doc.buttons.forEach((value, key) => {
-          buttonsObject[key] = value;
-        });
+      if (doc.buttons && doc.buttons.size > 0) {
+        const buttonsObject = Object.fromEntries(doc.buttons);
         dataText += `Buttons Clicked: ${JSON.stringify(buttonsObject)}\n`;
       } else {
-        dataText += `Buttons Clicked: No button data available\n`;
+        dataText += `Buttons Clicked: No button clicks\n`;
       }
 
       // Check and format links
-      if (doc.links instanceof Map) {
-        const linksObject = {};
-        doc.links.forEach((value, key) => {
-          linksObject[key] = value;
-        });
+      if (doc.links && doc.links.size > 0) {
+        const linksObject = Object.fromEntries(doc.links);
         dataText += `Links Clicked: ${JSON.stringify(linksObject)}\n\n`;
       } else {
-        dataText += `Links Clicked: No link data available\n\n`;
+        dataText += `Links Clicked: No link clicks\n\n`;
       }
     });
 
@@ -233,6 +227,7 @@ async function sendTrackingDataToClient(domain, email) {
     console.error('Error sending email:', error);
   }
 }
+
 
 // Function to send tracking data to all registered clients
 async function sendTrackingDataToAllClients() {
