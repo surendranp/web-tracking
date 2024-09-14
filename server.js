@@ -23,7 +23,7 @@ if (!mongoUri) {
 console.log('MongoDB URI:', mongoUri);
 
 // MongoDB Connection
-mongoose.connect(mongoUri)
+mongoose.connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log('MongoDB connected'))
   .catch(err => {
     console.error('MongoDB connection error:', err);
@@ -47,8 +47,8 @@ app.post('/api/register', async (req, res) => {
 
   try {
     const Registration = mongoose.model('Registration', new mongoose.Schema({
-      domain: String,
-      email: String
+      domain: { type: String, required: true },
+      email: { type: String, required: true }
     }));
 
     const registration = new Registration({ domain, email });
@@ -72,9 +72,9 @@ function getOrCreateTrackingModel(collectionName) {
       type: String,
       ip: String,
       sessionId: String,
-      timestamp: Date,
-      buttons: Object,
-      links: Object
+      timestamp: { type: Date, default: Date.now },
+      buttons: { type: Map, of: Number, default: {} },
+      links: { type: Map, of: Number, default: {} }
     });
 
     modelsCache[collectionName] = mongoose.model(collectionName, trackingSchema, collectionName);
