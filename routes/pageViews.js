@@ -2,9 +2,9 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 
-// Sanitize keys for safe storage in MongoDB
-function sanitizeKey(key) {
-  return key.replace(/[.\$]/g, '_');
+// Utility function to sanitize domain for MongoDB collection names
+function sanitizeDomain(domain) {
+  return domain.replace(/[.\$\/:]/g, '_');
 }
 
 // POST route to collect tracking data
@@ -17,71 +17,68 @@ router.post('/', async (req, res) => {
       return res.status(400).send('Missing required fields');
     }
 
-    // Sanitize domain to ensure consistency
-    const sanitizedDomain = sanitizeKey(domain); // Sanitize the domain name
+    // Sanitize domain for consistency
+    const sanitizedDomain = sanitizeDomain(domain);
 
-    // Check if the collection for the domain exists
-    let Tracking;
+    // Avoid recompiling the model if it already exists
+    let TrackingModel;
     try {
-      // Check if the collection model is already compiled
-      Tracking = mongoose.model(sanitizedDomain);  // This will throw if the model doesn't exist yet
+      TrackingModel = mongoose.model(sanitizedDomain);
     } catch (error) {
-      // If the model doesn't exist, create it (server should have already created this)
-      const trackingSchema = new mongoose.Schema({
-        type: { type: String, required: true },
-        url: { type: String, required: true },
-        buttons: { type: Map, of: Number, default: {} },  // Store button click counts
-        links: { type: Map, of: Number, default: {} },    // Store link click counts
-        pageviews: [String],                              // Track navigation flow
-        timestamp: { type: Date, default: Date.now },
-        ip: { type: String, required: true },
-        sessionId: String,
-        duration: Number,
-      });
+      if (error.name === 'MissingSchemaError') {
+        // If the model doesn't exist, use the pre-created schema
+        const trackingSchema = new mongoose.Schema({
+          type: { type: String, required: true },
+          url: { type: String, required: true },
+          buttons: { type: Map, of: Number, default: {} },
+          links: { type: Map, of: Number, default: {} },
+          pageviews: [String],
+          timestamp: { type: Date, default: Date.now },
+          ip: { type: String, required: true },
+          sessionId: String,
+          duration: Number,
+        });
 
-      // Create the model dynamically using the sanitized domain
-      Tracking = mongoose.model(sanitizedDomain, trackingSchema, sanitizedDomain);
+        // Create the model based on the domain name (should already exist)
+        TrackingModel = mongoose.model(sanitizedDomain, trackingSchema, sanitizedDomain);
+      } else {
+        throw error;
+      }
     }
 
-    // Find the document by IP and sessionId
-    let trackingData = await Tracking.findOne({ ip, sessionId });
+    // Find or create a document for the current session and IP
+    let trackingData = await TrackingModel.findOne({ ip, sessionId });
 
     if (!trackingData) {
-      // Create a new document if none exists
-      trackingData = new Tracking({
+      // Create new document if none exists
+      trackingData = new TrackingModel({
         type,
         url,
         ip,
         sessionId,
-        pageviews: [url] // Track the first pageview
+        pageviews: [url]
       });
     }
 
-    // Update pageviews for navigation flow
+    // Update data based on the event type
     if (type === 'pageview') {
       if (!trackingData.pageviews.includes(url)) {
         trackingData.pageviews.push(url);
       }
-    }
-
-    // Track button clicks
-    if (type === 'button_click') {
-      const sanitizedButtonName = sanitizeKey(buttonName || '');
+    } else if (type === 'button_click') {
+      const sanitizedButtonName = buttonName ? buttonName.replace(/[.\$]/g, '_') : 'Unnamed Button';
       trackingData.buttons.set(sanitizedButtonName, (trackingData.buttons.get(sanitizedButtonName) || 0) + 1);
-    }
-
-    // Track link clicks
-    if (type === 'link_click') {
-      const sanitizedLinkName = sanitizeKey(linkName || '');
+    } else if (type === 'link_click') {
+      const sanitizedLinkName = linkName ? linkName.replace(/[.\$]/g, '_') : 'Unnamed Link';
       trackingData.links.set(sanitizedLinkName, (trackingData.links.get(sanitizedLinkName) || 0) + 1);
     }
 
     // Save updated tracking data
     await trackingData.save();
 
-    res.status(200).send('Data received');
+    res.status(200).send('Tracking data stored successfully');
   } catch (error) {
-    console.error('Error saving tracking data:', error.message, error);
+    console.error('Error saving tracking data:', error);
     res.status(500).send('Internal Server Error');
   }
 });
