@@ -26,12 +26,13 @@ function getOrCreateTrackingModel(collectionName) {
 
 // POST route to collect tracking data
 router.post('/', async (req, res) => {
+  console.log('Received data:', req.body); // Log the received data for debugging
+
   try {
     const { type, buttonName, linkName, url, ip, sessionId, domain } = req.body;
 
     if (!type || !url || !ip || !sessionId || !domain) {
       console.error('Error: Missing required fields');
-      console.error('Received data:', req.body); // Log the received data
       return res.status(400).send('Missing required fields');
     }
 
