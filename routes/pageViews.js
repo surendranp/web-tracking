@@ -7,6 +7,23 @@ function sanitizeKey(key) {
   return key.replace(/[.\$]/g, '_');
 }
 
+// Define a function to get or create a model
+function getOrCreateTrackingModel(collectionName) {
+  const trackingSchema = new mongoose.Schema({
+    type: { type: String, required: true },
+    url: { type: String, required: true },
+    buttons: { type: Map, of: Number, default: {} },  // Store button click counts
+    links: { type: Map, of: Number, default: {} },    // Store link click counts
+    pageviews: [String],                              // Track navigation flow
+    timestamp: { type: Date, default: Date.now },
+    ip: { type: String, required: true },
+    sessionId: { type: String, required: true },
+    duration: Number,
+  });
+
+  return mongoose.models[collectionName] || mongoose.model(collectionName, trackingSchema, collectionName);
+}
+
 // POST route to collect tracking data
 router.post('/', async (req, res) => {
   try {
@@ -20,34 +37,12 @@ router.post('/', async (req, res) => {
 
     // Create a dynamic collection name based on the domain
     const collectionName = sanitizeKey(domain); // Sanitize the domain name
+    const Tracking = getOrCreateTrackingModel(collectionName);
 
-    // Define the schema based on tracking data structure
-    const trackingSchema = new mongoose.Schema({
-      type: { type: String, required: true },
-      url: { type: String, required: true },
-      buttons: { type: Map, of: Number, default: {} },  // Store button click counts
-      links: { type: Map, of: Number, default: {} },    // Store link click counts
-      pageviews: [String],                              // Track navigation flow
-      timestamp: { type: Date, default: Date.now },
-      ip: { type: String, required: true },
-      sessionId: String,
-      duration: Number,
-    });
-
-    let Tracking;
-
-    // Check if model is already defined
-    if (mongoose.models[collectionName]) {
-      Tracking = mongoose.models[collectionName];
-    } else {
-      Tracking = mongoose.model(collectionName, trackingSchema, collectionName);
-    }
-
-    // Find the document by IP and sessionId
+    // Find or create a document
     let trackingData = await Tracking.findOne({ ip, sessionId });
 
     if (!trackingData) {
-      // Create a new document if none exists
       trackingData = new Tracking({
         type,
         url,

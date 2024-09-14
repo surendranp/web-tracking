@@ -5,7 +5,7 @@
       buttonName: document.querySelector('meta[name="button-name"]')?.getAttribute('content') || '',
       linkName: document.querySelector('meta[name="link-name"]')?.getAttribute('content') || '',
       url: window.location.href,
-      ip: '', // Implement a method to fetch IP if required
+      ip: '', // Implement IP fetching if needed
       sessionId: getSessionId(),
       domain: window.location.hostname // Captures the domain name including subdomains
     };

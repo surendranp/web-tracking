@@ -23,7 +23,7 @@ if (!mongoUri) {
 console.log('MongoDB URI:', mongoUri);
 
 // MongoDB Connection
-mongoose.connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true })
+mongoose.connect(mongoUri)
   .then(() => console.log('MongoDB connected'))
   .catch(err => {
     console.error('MongoDB connection error:', err);
@@ -72,9 +72,9 @@ function getOrCreateTrackingModel(collectionName) {
       type: String,
       ip: String,
       sessionId: String,
-      timestamp: { type: Date, default: Date.now },
-      buttons: { type: Map, of: Number, default: {} },
-      links: { type: Map, of: Number, default: {} }
+      timestamp: Date,
+      buttons: Object,
+      links: Object
     });
 
     modelsCache[collectionName] = mongoose.model(collectionName, trackingSchema, collectionName);
@@ -101,60 +101,45 @@ async function sendTrackingDataToClient(domain, email) {
 
     // Check if there is any data to send
     if (!trackingData.length) {
-      console.log(`No tracking data available for ${domain}`);
+      console.log(`No tracking data available for domain: ${domain}`);
       return;
     }
 
-    // Format tracking data for email
-    let dataText = `Tracking data for ${domain}:\n\n`;
-    trackingData.forEach(doc => {
-      dataText += `URL: ${doc.url}\n`;
-      dataText += `Type: ${doc.type}\n`;
-      dataText += `IP: ${doc.ip}\n`;
-      dataText += `Session ID: ${doc.sessionId}\n`;
-      dataText += `Timestamp: ${new Date(doc.timestamp).toLocaleString()}\n`;
-      dataText += `Buttons Clicked: ${JSON.stringify(doc.buttons)}\n`;
-      dataText += `Links Clicked: ${JSON.stringify(doc.links)}\n\n`;
-    });
+    // Construct the email content
+    const emailContent = trackingData.map(data => `
+      <p><strong>URL:</strong> ${data.url}</p>
+      <p><strong>Type:</strong> ${data.type}</p>
+      <p><strong>IP:</strong> ${data.ip}</p>
+      <p><strong>Session ID:</strong> ${data.sessionId}</p>
+      <p><strong>Timestamp:</strong> ${data.timestamp}</p>
+      <hr>
+    `).join('');
 
-    const mailOptions = {
+    // Send email
+    await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: email,
       subject: `Tracking Data for ${domain}`,
-      text: dataText || 'No tracking data available.'
-    };
+      html: emailContent
+    });
 
-    await transporter.sendMail(mailOptions);
     console.log(`Tracking data sent to ${email}`);
   } catch (error) {
-    console.error('Error sending email:', error);
+    console.error('Error sending tracking data:', error);
   }
 }
 
-// Function to send tracking data to all registered clients
-async function sendTrackingDataToAllClients() {
-  const Registration = mongoose.model('Registration');
-
-  const registrations = await Registration.find();
-
-  for (const reg of registrations) {
-    try {
-      await sendTrackingDataToClient(reg.domain, reg.email);
-    } catch (error) {
-      console.error(`Error sending data to ${reg.email}:`, error);
-    }
-  }
-}
-
-// Schedule the task to run every 2 minutes
+// Schedule the email sending task
 cron.schedule('*/2 * * * *', async () => {
-  console.log('Running scheduled task to send tracking data...');
-  await sendTrackingDataToAllClients();
+  try {
+    const registrations = await mongoose.model('Registration').find().lean();
+    for (const reg of registrations) {
+      await sendTrackingDataToClient(reg.domain, reg.email);
+    }
+  } catch (error) {
+    console.error('Error fetching registrations or sending data:', error);
+  }
 });
 
-// Serve the dashboard page
-app.get('/dashboard', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/dashboard.html'));
-});
-
+// Start the server
 app.listen(port, () => console.log(`Server running on port ${port}`));
