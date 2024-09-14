@@ -1,5 +1,5 @@
 (function() {
-  const trackingUrl = 'https://web-tracking-mongodburi.up.railway.app/api/pageviews'; // Replace with your actual API URL
+  const trackingUrl = 'https://web-tracking-mongodburi.up.railway.app/api/pageviews';
 
   async function getUserIP() {
     try {
@@ -18,20 +18,19 @@
 
   async function sendTrackingData(data) {
     const ip = await getUserIP();
-    const domain = window.location.hostname;  // Capture the domain name
+    const domain = window.location.hostname; // Capture the domain name
     fetch(trackingUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ ...data, ip, domain })  // Send the domain name to the server
+      body: JSON.stringify({ ...data, ip, domain })
     }).catch(error => console.error('Error sending tracking data:', error.message));
   }
 
   let sessionId = localStorage.getItem('sessionId') || generateSessionId();
   localStorage.setItem('sessionId', sessionId);
 
-  // Track page view
   function trackPageView() {
     sendTrackingData({
       type: 'pageview',
@@ -43,12 +42,11 @@
 
   trackPageView(); // Initial page view tracking
 
-  // Track click events
   document.addEventListener('click', function(event) {
     let elementName = 'Unnamed Element';
 
     if (event.target.tagName === 'BUTTON') {
-      elementName = event.target.innerText || 'Unnamed Button';
+      elementName = event.target.innerText || event.target.id || 'Unnamed Button';
       sendTrackingData({
         type: 'button_click',
         buttonName: elementName,
@@ -57,7 +55,7 @@
         sessionId
       });
     } else if (event.target.tagName === 'A') {
-      elementName = event.target.href;
+      elementName = event.target.innerText || event.target.id || 'Unnamed Link';
       sendTrackingData({
         type: 'link_click',
         linkName: elementName,
@@ -67,4 +65,7 @@
       });
     }
   });
+
+  window.addEventListener('popstate', trackPageView);
+  window.addEventListener('hashchange', trackPageView);
 })();
