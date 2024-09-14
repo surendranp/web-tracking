@@ -51,8 +51,28 @@ app.post('/api/register', async (req, res) => {
       email: String
     }));
 
+    // Check if the domain is already registered
+    const existingRegistration = await Registration.findOne({ domain });
+    if (existingRegistration) {
+      return res.status(400).send('Domain is already registered.');
+    }
+
     const registration = new Registration({ domain, email });
     await registration.save();
+
+    // Create a collection for the domain
+    const collectionName = domain.replace(/[.\$]/g, '_');
+    const trackingSchema = new mongoose.Schema({
+      type: String,
+      url: String,
+      ip: String,
+      sessionId: String,
+      timestamp: Date,
+      buttons: Object,
+      links: Object
+    });
+
+    mongoose.model(collectionName, trackingSchema, collectionName);
 
     res.status(200).send('Registration successful.');
   } catch (error) {
@@ -67,22 +87,11 @@ async function sendTrackingDataToClient(domain, email) {
 
   // Check if the model has already been compiled
   let Tracking;
-  if (mongoose.models[collectionName]) {
-    Tracking = mongoose.models[collectionName]; // Use existing model
-  } else {
-    // Define the schema based on tracking data structure
-    const trackingSchema = new mongoose.Schema({
-      url: String,
-      type: String,
-      ip: String,
-      sessionId: String,
-      timestamp: Date,
-      buttons: Object,
-      links: Object
-    });
-
-    // Create the model dynamically using the collectionName
-    Tracking = mongoose.model(collectionName, trackingSchema, collectionName);
+  try {
+    Tracking = mongoose.model(collectionName); // Use existing model
+  } catch (error) {
+    console.error('Tracking model not found for domain:', domain);
+    return;
   }
 
   const transporter = nodemailer.createTransport({
@@ -141,7 +150,7 @@ async function sendTrackingDataToAllClients() {
 }
 
 // Schedule the task to run every 2 minutes
-cron.schedule('*/2 * * * *', async () => {
+cron.schedule('* * * * *', async () => {
   console.log('Running scheduled task to send tracking data...');
   await sendTrackingDataToAllClients();
 });
