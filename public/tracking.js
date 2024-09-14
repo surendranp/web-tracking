@@ -30,7 +30,7 @@
 
   let sessionId = localStorage.getItem('sessionId') || generateSessionId();
   localStorage.setItem('sessionId', sessionId);
- 
+
   // Track page view
   function trackPageView() {
     sendTrackingData({

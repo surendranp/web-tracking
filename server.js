@@ -33,11 +33,6 @@ mongoose.connect(mongoUri)
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Serve home.html on base URL
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/home.html'));
-});
-
 // Import and use routes
 const pageViews = require('./routes/pageViews');
 app.use('/api/pageviews', pageViews);
@@ -137,15 +132,16 @@ async function sendTrackingDataToClient(domain, email) {
 // Function to send tracking data to all registered clients
 async function sendTrackingDataToAllClients() {
   const Registration = mongoose.model('Registration');
+
   const registrations = await Registration.find();
 
-  for (const reg of registrations) {
+  registrations.forEach(async (reg) => {
     await sendTrackingDataToClient(reg.domain, reg.email);
-  }
+  });
 }
 
-// Schedule the task to run every day at midnight
-cron.schedule('* * * * *', async () => {
+// Schedule the task to run every 2 minutes
+cron.schedule('*/2 * * * *', async () => {
   console.log('Running scheduled task to send tracking data...');
   await sendTrackingDataToAllClients();
 });
