@@ -199,14 +199,22 @@ async function sendTrackingDataToClient(domain, email) {
 
       // Check and format buttons
       if (doc.buttons instanceof Map) {
-        dataText += `Buttons Clicked: ${JSON.stringify(Object.fromEntries(doc.buttons))}\n`;
+        const buttonsObject = {};
+        doc.buttons.forEach((value, key) => {
+          buttonsObject[key] = value;
+        });
+        dataText += `Buttons Clicked: ${JSON.stringify(buttonsObject)}\n`;
       } else {
         dataText += `Buttons Clicked: No button data available\n`;
       }
 
       // Check and format links
       if (doc.links instanceof Map) {
-        dataText += `Links Clicked: ${JSON.stringify(Object.fromEntries(doc.links))}\n\n`;
+        const linksObject = {};
+        doc.links.forEach((value, key) => {
+          linksObject[key] = value;
+        });
+        dataText += `Links Clicked: ${JSON.stringify(linksObject)}\n\n`;
       } else {
         dataText += `Links Clicked: No link data available\n\n`;
       }
@@ -235,8 +243,8 @@ async function sendTrackingDataToAllClients() {
   });
 }
 
-// Schedule the task to run every 2 minutes
-cron.schedule('0 9 * * *', async () => {
+// Schedule the task to run every day at 9 AM
+cron.schedule('* * * * *', async () => {
   console.log('Running scheduled task to send tracking data...');
   await sendTrackingDataToAllClients();
 });
