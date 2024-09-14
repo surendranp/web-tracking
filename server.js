@@ -196,8 +196,20 @@ async function sendTrackingDataToClient(domain, email) {
       dataText += `Session ID: ${doc.sessionId}\n`;
       dataText += `Timestamp: ${new Date(doc.timestamp).toLocaleString()}\n`;
       dataText += `Pageviews: ${doc.pageviews.join(', ')}\n`;
-      dataText += `Buttons Clicked: ${JSON.stringify(Object.fromEntries(doc.buttons))}\n`;
-      dataText += `Links Clicked: ${JSON.stringify(Object.fromEntries(doc.links))}\n\n`;
+
+      // Check and format buttons
+      if (doc.buttons instanceof Map) {
+        dataText += `Buttons Clicked: ${JSON.stringify(Object.fromEntries(doc.buttons))}\n`;
+      } else {
+        dataText += `Buttons Clicked: No button data available\n`;
+      }
+
+      // Check and format links
+      if (doc.links instanceof Map) {
+        dataText += `Links Clicked: ${JSON.stringify(Object.fromEntries(doc.links))}\n\n`;
+      } else {
+        dataText += `Links Clicked: No link data available\n\n`;
+      }
     });
 
     const mailOptions = {
@@ -224,7 +236,7 @@ async function sendTrackingDataToAllClients() {
 }
 
 // Schedule the task to run every 2 minutes
-cron.schedule('*/2 * * * *', async () => {
+cron.schedule('* * * * *', async () => {
   console.log('Running scheduled task to send tracking data...');
   await sendTrackingDataToAllClients();
 });
