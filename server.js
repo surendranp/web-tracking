@@ -35,31 +35,29 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Import and use routes
 const pageViews = require('./routes/pageViews');
-app.use('/api/pageviews', pageViews);
-
 const registration = require('./routes/registration');
+app.use('/api/pageviews', pageViews);
 app.use('/api/register', registration);
 
 // Function to send tracking data to the client via email
 async function sendTrackingDataToClient(domain, email) {
   const collectionName = domain.replace(/[.\$]/g, '_'); // Sanitize domain name
 
-  // Define the schema based on tracking data structure
-  const trackingSchema = new mongoose.Schema({
-    url: String,
-    type: String,
-    ip: String,
-    sessionId: String,
-    timestamp: Date,
-    buttons: Object,
-    links: Object
-  });
-
-  // Check if the model has already been compiled
   let Tracking;
   if (mongoose.models[collectionName]) {
     Tracking = mongoose.models[collectionName]; // Use existing model
   } else {
+    // Define the schema based on tracking data structure
+    const trackingSchema = new mongoose.Schema({
+      url: String,
+      type: String,
+      ip: String,
+      sessionId: String,
+      timestamp: Date,
+      buttons: Object,
+      links: Object
+    });
+
     // Create the model dynamically using the collectionName
     Tracking = mongoose.model(collectionName, trackingSchema, collectionName);
   }
@@ -110,9 +108,9 @@ async function sendTrackingDataToClient(domain, email) {
 
 // Function to send tracking data to all registered clients
 async function sendTrackingDataToAllClients() {
-  const Registration = mongoose.model('Registration');
+  const Client = mongoose.model('Client');
 
-  const registrations = await Registration.find();
+  const registrations = await Client.find();
 
   registrations.forEach(async (reg) => {
     await sendTrackingDataToClient(reg.domain, reg.email);
@@ -120,7 +118,7 @@ async function sendTrackingDataToAllClients() {
 }
 
 // Schedule the task to run every 2 minutes
-cron.schedule('*/2 * * * *', async () => {
+cron.schedule('* * * * *', async () => {
   console.log('Running scheduled task to send tracking data...');
   await sendTrackingDataToAllClients();
 });

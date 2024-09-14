@@ -32,11 +32,10 @@ router.post('/', async (req, res) => {
     });
 
     let Tracking;
-
     try {
       Tracking = mongoose.model(collectionName);
     } catch (error) {
-      Tracking = mongoose.model(collectionName, trackingSchema); // Define model only if it does not already exist
+      Tracking = mongoose.model(collectionName, trackingSchema, collectionName); // Define model only if it does not already exist
     }
 
     // Find the document by IP and sessionId
