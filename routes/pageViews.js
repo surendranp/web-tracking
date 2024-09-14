@@ -2,22 +2,6 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 
-// Define schema for tracking data
-const trackingSchema = new mongoose.Schema({
-  type: { type: String, required: true },
-  url: { type: String, required: true },
-  buttons: { type: Map, of: Number, default: {} },  // Store button click counts
-  links: { type: Map, of: Number, default: {} },    // Store link click counts
-  pageviews: [String],                              // Track navigation flow
-  timestamp: { type: Date, default: Date.now },
-  ip: { type: String, required: true },
-  sessionId: String,
-  duration: Number,
-});
-
-// Create model
-const Tracking = mongoose.model('Tracking', trackingSchema);
-
 // Sanitize keys for safe storage in MongoDB
 function sanitizeKey(key) {
   return key.replace(/[.\$]/g, '_');
@@ -26,10 +10,33 @@ function sanitizeKey(key) {
 // POST route to collect tracking data
 router.post('/', async (req, res) => {
   try {
-    const { type, buttonName, linkName, url, ip, sessionId } = req.body;
+    const { type, buttonName, linkName, url, ip, sessionId, domain } = req.body;
 
-    if (!type || !url || !ip || !sessionId) {
+    if (!type || !url || !ip || !sessionId || !domain) {
+      console.error('Error: Missing required fields');
       return res.status(400).send('Missing required fields');
+    }
+
+    // Create a dynamic collection name based on the domain
+    const collectionName = sanitizeKey(domain); // Sanitize the domain name
+    const trackingSchema = new mongoose.Schema({
+      type: { type: String, required: true },
+      url: { type: String, required: true },
+      buttons: { type: Map, of: Number, default: {} },  // Store button click counts
+      links: { type: Map, of: Number, default: {} },    // Store link click counts
+      pageviews: [String],                              // Track navigation flow
+      timestamp: { type: Date, default: Date.now },
+      ip: { type: String, required: true },
+      sessionId: String,
+      duration: Number,
+    });
+
+    let Tracking;
+
+    try {
+      Tracking = mongoose.model(collectionName);
+    } catch (error) {
+      Tracking = mongoose.model(collectionName, trackingSchema); // Define model only if it does not already exist
     }
 
     // Find the document by IP and sessionId
@@ -70,18 +77,7 @@ router.post('/', async (req, res) => {
 
     res.status(200).send('Data received');
   } catch (error) {
-    console.error('Error saving tracking data:', error.message);
-    res.status(500).send('Internal Server Error');
-  }
-});
-
-// GET route to retrieve all tracking data
-router.get('/', async (req, res) => {
-  try {
-    const data = await Tracking.find();
-    res.json(data);
-  } catch (error) {
-    console.error('Error fetching tracking data:', error.message);
+    console.error('Error saving tracking data:', error.message, error);
     res.status(500).send('Internal Server Error');
   }
 });
