@@ -35,6 +35,14 @@ function sanitizeDomain(domain) {
   return domain.replace(/[.\$\/:]/g, '_');
 }
 
+// Ensure the `Registration` model is only defined once
+const RegistrationSchema = new mongoose.Schema({
+  domain: { type: String, required: true, unique: true },
+  email: { type: String, required: true }
+});
+
+const Registration = mongoose.models.Registration || mongoose.model('Registration', RegistrationSchema);
+
 // Register route for domain and email
 app.post('/api/register', async (req, res) => {
   const { domain, email } = req.body;
@@ -44,11 +52,6 @@ app.post('/api/register', async (req, res) => {
   }
 
   try {
-    const Registration = mongoose.model('Registration', new mongoose.Schema({
-      domain: { type: String, required: true, unique: true },
-      email: { type: String, required: true }
-    }));
-
     const registration = new Registration({ domain, email });
     await registration.save();
 
@@ -64,12 +67,14 @@ app.post('/api/register', async (req, res) => {
         buttons: Object,
         links: Object
       });
-
       mongoose.model(collectionName, trackingSchema, collectionName);
     }
 
     res.status(200).send('Registration successful.');
   } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).send('Domain already registered.');
+    }
     console.error('Error registering domain:', error);
     res.status(500).send('Internal Server Error');
   }
@@ -188,7 +193,6 @@ async function sendTrackingDataToClient(domain, email) {
 
 // Function to send tracking data to all registered clients
 async function sendTrackingDataToAllClients() {
-  const Registration = mongoose.model('Registration');
   const registrations = await Registration.find();
 
   registrations.forEach(async (reg) => {
@@ -206,14 +210,14 @@ cron.schedule('*/2 * * * *', async () => {
 app.get('/dashboard', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/dashboard.html'));
 });
+
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/home.html'));
 });
+
 app.get('/tracking.js', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/tracking.js')); // Adjust the path if the file is located elsewhere
 });
 
-
 app.listen(port, () => console.log(`Server running on port ${port}`));
 
-// -------------
