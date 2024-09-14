@@ -7,68 +7,50 @@
       const data = await response.json();
       return data.ip;
     } catch (error) {
-      console.error('Error fetching IP address:', error.message);
-      return 'unknown';
+      console.error('Error getting user IP:', error);
+      return '';
     }
   }
 
-  function generateSessionId() {
-    return Math.random().toString(36).substr(2, 9);
-  }
-
-  async function sendTrackingData(data) {
+  async function sendTrackingData(type, buttonName, linkName) {
+    const url = window.location.href;
     const ip = await getUserIP();
-    const domain = window.location.hostname;  // Capture the domain name
-    fetch(trackingUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ ...data, ip, domain })  // Send the domain name to the server
-    }).catch(error => console.error('Error sending tracking data:', error.message));
+    const sessionId = sessionStorage.getItem('sessionId') || Math.random().toString(36).substring(2);
+    sessionStorage.setItem('sessionId', sessionId);
+
+    const trackingData = {
+      type,
+      buttonName,
+      linkName,
+      url,
+      ip,
+      sessionId,
+      domain: window.location.hostname
+    };
+
+    try {
+      await fetch(trackingUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(trackingData)
+      });
+    } catch (error) {
+      console.error('Error sending tracking data:', error);
+    }
   }
 
-  let sessionId = localStorage.getItem('sessionId') || generateSessionId();
-  localStorage.setItem('sessionId', sessionId);
-
-  // Track page view
-  function trackPageView() {
-    sendTrackingData({
-      type: 'pageview',
-      url: window.location.href,
-      timestamp: new Date().toISOString(),
-      sessionId
-    });
-  }
-
-  trackPageView(); // Initial page view tracking
-
-  // Track click events
-  document.addEventListener('click', function(event) {
-    let elementName = 'Unnamed Element';
-
+  // Event listeners for tracking
+  document.addEventListener('click', event => {
     if (event.target.tagName === 'BUTTON') {
-      elementName = event.target.innerText || event.target.id || 'Unnamed Button';
-      sendTrackingData({
-        type: 'button_click',
-        buttonName: elementName,
-        url: window.location.href,
-        timestamp: new Date().toISOString(),
-        sessionId
-      });
-    } else if (event.target.tagName === 'A') {
-      elementName = event.target.href || 'Unnamed Link';
-      sendTrackingData({
-        type: 'link_click',
-        linkName: elementName,
-        url: window.location.href,
-        timestamp: new Date().toISOString(),
-        sessionId
-      });
+      sendTrackingData('button_click', event.target.name || '');
+    }
+    if (event.target.tagName === 'A') {
+      sendTrackingData('link_click', event.target.href || '');
     }
   });
 
-  // Track navigation
-  window.addEventListener('popstate', trackPageView);
-
+  // Track page views
+  sendTrackingData('pageview');
 })();

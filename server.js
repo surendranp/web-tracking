@@ -4,7 +4,7 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
 const nodemailer = require('nodemailer');
-const cron = require('node-cron');
+const cron = require('node-cron'); // For scheduling tasks
 require('dotenv').config();
 
 const app = express();
@@ -35,30 +35,31 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Import and use routes
 const pageViews = require('./routes/pageViews');
-const registration = require('./routes/registration');
 app.use('/api/pageviews', pageViews);
+
+const registration = require('./routes/registration');
 app.use('/api/register', registration);
 
 // Function to send tracking data to the client via email
 async function sendTrackingDataToClient(domain, email) {
   const collectionName = domain.replace(/[.\$]/g, '_'); // Sanitize domain name
 
+  // Define the schema based on tracking data structure
+  const trackingSchema = new mongoose.Schema({
+    url: String,
+    type: String,
+    ip: String,
+    sessionId: String,
+    timestamp: Date,
+    buttons: Object,
+    links: Object
+  });
+
   // Check if the model has already been compiled
   let Tracking;
   if (mongoose.models[collectionName]) {
     Tracking = mongoose.models[collectionName]; // Use existing model
   } else {
-    // Define the schema based on tracking data structure
-    const trackingSchema = new mongoose.Schema({
-      url: String,
-      type: String,
-      ip: String,
-      sessionId: String,
-      timestamp: Date,
-      buttons: Object,
-      links: Object
-    });
-
     // Create the model dynamically using the collectionName
     Tracking = mongoose.model(collectionName, trackingSchema, collectionName);
   }

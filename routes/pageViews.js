@@ -18,13 +18,13 @@ router.post('/', async (req, res) => {
     }
 
     // Create a dynamic collection name based on the domain
-    const collectionName = sanitizeKey(domain);
+    const collectionName = sanitizeKey(domain); // Sanitize the domain name
     const trackingSchema = new mongoose.Schema({
       type: { type: String, required: true },
       url: { type: String, required: true },
-      buttons: { type: Map, of: Number, default: {} },
-      links: { type: Map, of: Number, default: {} },
-      pageviews: [String],
+      buttons: { type: Map, of: Number, default: {} },  // Store button click counts
+      links: { type: Map, of: Number, default: {} },    // Store link click counts
+      pageviews: [String],                              // Track navigation flow
       timestamp: { type: Date, default: Date.now },
       ip: { type: String, required: true },
       sessionId: String,
@@ -36,7 +36,7 @@ router.post('/', async (req, res) => {
     try {
       Tracking = mongoose.model(collectionName);
     } catch (error) {
-      Tracking = mongoose.model(collectionName, trackingSchema, collectionName);
+      Tracking = mongoose.model(collectionName, trackingSchema); // Define model only if it does not already exist
     }
 
     // Find the document by IP and sessionId
