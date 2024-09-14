@@ -4,7 +4,7 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
 const nodemailer = require('nodemailer');
-const cron = require('node-cron'); // For scheduling tasks
+const cron = require('node-cron');
 require('dotenv').config();
 
 const app = express();
@@ -29,9 +29,6 @@ mongoose.connect(mongoUri)
     console.error('MongoDB connection error:', err);
     process.exit(1);
   });
-
-// Serve static files
-app.use(express.static(path.join(__dirname, 'public')));
 
 // Function to sanitize the domain to be used as a collection name
 function sanitizeDomain(domain) {
@@ -78,16 +75,61 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
+// Endpoint for tracking script to send data
+app.post('/api/pageviews', async (req, res) => {
+  const { domain, url, type, ip, sessionId, buttons, links } = req.body;
+
+  if (!domain) {
+    return res.status(400).send('Domain is required.');
+  }
+
+  try {
+    const collectionName = sanitizeDomain(domain);
+
+    // Ensure the collection is created if it doesn't exist yet
+    let Tracking;
+    if (mongoose.models[collectionName]) {
+      Tracking = mongoose.model(collectionName);
+    } else {
+      const trackingSchema = new mongoose.Schema({
+        url: String,
+        type: String,
+        ip: String,
+        sessionId: String,
+        timestamp: { type: Date, default: Date.now },
+        buttons: Object,
+        links: Object
+      });
+      Tracking = mongoose.model(collectionName, trackingSchema, collectionName);
+    }
+
+    // Save the tracking data in the respective domain's collection
+    const trackingData = new Tracking({
+      url,
+      type,
+      ip,
+      sessionId,
+      buttons,
+      links
+    });
+
+    await trackingData.save();
+    res.status(200).send('Tracking data saved successfully.');
+  } catch (error) {
+    console.error('Error saving tracking data:', error);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
 // Function to send tracking data to the client via email
 async function sendTrackingDataToClient(domain, email) {
   const collectionName = sanitizeDomain(domain); // Sanitize domain name
 
-  // Check if the model already exists and reuse it if it does
+  // Reuse existing model or create a new one if necessary
   let Tracking;
   if (mongoose.models[collectionName]) {
-    Tracking = mongoose.model(collectionName); // Use the existing model
+    Tracking = mongoose.model(collectionName);
   } else {
-    // Define the schema based on tracking data structure if the model doesn't exist
     const trackingSchema = new mongoose.Schema({
       url: String,
       type: String,
@@ -97,8 +139,6 @@ async function sendTrackingDataToClient(domain, email) {
       buttons: Object,
       links: Object
     });
-
-    // Create the model dynamically using the collectionName
     Tracking = mongoose.model(collectionName, trackingSchema, collectionName);
   }
 
@@ -112,7 +152,7 @@ async function sendTrackingDataToClient(domain, email) {
 
   try {
     // Retrieve all tracking data for the domain
-    const trackingData = await Tracking.find().lean(); // Use lean for better performance
+    const trackingData = await Tracking.find().lean();
 
     // Check if there is any data to send
     if (!trackingData.length) {
@@ -149,7 +189,6 @@ async function sendTrackingDataToClient(domain, email) {
 // Function to send tracking data to all registered clients
 async function sendTrackingDataToAllClients() {
   const Registration = mongoose.model('Registration');
-
   const registrations = await Registration.find();
 
   registrations.forEach(async (reg) => {
@@ -158,7 +197,7 @@ async function sendTrackingDataToAllClients() {
 }
 
 // Schedule the task to run every 2 minutes
-cron.schedule('* * * * *', async () => {
+cron.schedule('*/2 * * * *', async () => {
   console.log('Running scheduled task to send tracking data...');
   await sendTrackingDataToAllClients();
 });
