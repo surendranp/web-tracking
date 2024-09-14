@@ -54,6 +54,22 @@ app.post('/api/register', async (req, res) => {
     const registration = new Registration({ domain, email });
     await registration.save();
 
+    // Create a schema and model for the domain's tracking data if it doesn't already exist
+    const collectionName = domain.replace(/[.\$]/g, '_');
+    if (!mongoose.models[collectionName]) {
+      const trackingSchema = new mongoose.Schema({
+        url: String,
+        type: String,
+        ip: String,
+        sessionId: String,
+        timestamp: Date,
+        buttons: Object,
+        links: Object
+      });
+
+      mongoose.model(collectionName, trackingSchema, collectionName);
+    }
+
     res.status(200).send('Registration successful.');
   } catch (error) {
     console.error('Error registering domain:', error);
