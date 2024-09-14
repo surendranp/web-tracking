@@ -8,14 +8,14 @@ require('dotenv').config();
 const app = express();
 app.use(bodyParser.json());
 
-// Connect to MongoDB
+// MongoDB connection
 mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 }).then(() => console.log('Connected to MongoDB'))
   .catch(err => console.error('MongoDB connection error:', err));
 
-// Define tracking schema
+// Define the tracking schema
 const trackingSchema = new mongoose.Schema({
   type: { type: String, required: true },
   url: { type: String, required: true },
@@ -28,17 +28,18 @@ const trackingSchema = new mongoose.Schema({
   duration: { type: Number, default: 0 },
 });
 
-// Sanitize domain name for MongoDB collection
-function sanitizeKey(key) {
-  return key.replace(/[^\w]/g, '_'); // Replace any non-word character with '_'
+// Sanitize domain name for MongoDB collection names
+function sanitizeDomain(domain) {
+  return domain.replace(/[^\w]/g, '_');  // Replace non-word characters with '_'
 }
 
-// Dynamically create or fetch the appropriate model
+// Dynamically fetch or create a model based on the domain name
 function getTrackingModel(domain) {
-  const collectionName = sanitizeKey(domain);
-  return mongoose.modelNames().includes(collectionName)
-    ? mongoose.model(collectionName)
-    : mongoose.model(collectionName, trackingSchema, collectionName);
+  const collectionName = sanitizeDomain(domain);
+  if (mongoose.modelNames().includes(collectionName)) {
+    return mongoose.model(collectionName);  // Return existing model
+  }
+  return mongoose.model(collectionName, trackingSchema, collectionName);  // Create a new model
 }
 
 // Registration schema for domain and email
@@ -49,10 +50,10 @@ const registrationSchema = new mongoose.Schema({
 
 const Registration = mongoose.model('Registration', registrationSchema);
 
-// Register client domains
+// Register a client domain and email
 app.post('/api/register', async (req, res) => {
   const { domain, email } = req.body;
-  
+
   try {
     const existingRegistration = await Registration.findOne({ domain });
     if (existingRegistration) {
@@ -61,21 +62,24 @@ app.post('/api/register', async (req, res) => {
     
     const registration = new Registration({ domain, email });
     await registration.save();
-    res.status(201).send('Registered successfully!');
+    res.status(201).send('Registration successful!');
   } catch (error) {
-    console.error('Error registering client:', error);
+    console.error('Registration error:', error);
     res.status(500).send('Registration failed.');
   }
 });
 
-// Track user activity
+// Track user activity and store in domain-named collection
 app.post('/api/pageviews', async (req, res) => {
   const { domain, type, url, buttons, links, pageviews, ip, sessionId, duration } = req.body;
 
   try {
-    const Tracking = getTrackingModel(domain);
-    const newTracking = new Tracking({ type, url, buttons, links, pageviews, ip, sessionId, duration });
-    await newTracking.save();
+    const TrackingModel = getTrackingModel(domain);  // Dynamically get the correct model
+    const trackingData = new TrackingModel({
+      type, url, buttons, links, pageviews, ip, sessionId, duration,
+    });
+    await trackingData.save();
+    console.log(`Tracking data saved for domain: ${domain}`);
     res.status(201).send('Tracking data saved.');
   } catch (error) {
     console.error('Error saving tracking data:', error);
@@ -83,12 +87,19 @@ app.post('/api/pageviews', async (req, res) => {
   }
 });
 
-// Email function
+// Email function to send tracking data to the client
 async function sendTrackingDataToClient(domain, email) {
-  const Tracking = getTrackingModel(domain);
-
+  const TrackingModel = getTrackingModel(domain);
+  
   try {
-    const data = await Tracking.find({ timestamp: { $gte: new Date(Date.now() - 86400000) } }); // Last 24 hours of data
+    // Fetch last 24 hours of tracking data
+    const data = await TrackingModel.find({ timestamp: { $gte: new Date(Date.now() - 86400000) } });
+    if (data.length === 0) {
+      console.log(`No tracking data found for domain: ${domain}`);
+      return; // Skip if no data available
+    }
+
+    // Setup email transporter
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
@@ -100,35 +111,37 @@ async function sendTrackingDataToClient(domain, email) {
     const mailOptions = {
       from: process.env.EMAIL,
       to: email,
-      subject: `Tracking Data for ${domain}`,
+      subject: `Daily Tracking Data for ${domain}`,
       text: `Here is your tracking data: ${JSON.stringify(data, null, 2)}`,
     };
 
     await transporter.sendMail(mailOptions);
-    console.log(`Tracking data sent to ${email}`);
+    console.log(`Tracking data sent to ${email} for domain: ${domain}`);
   } catch (error) {
-    console.error(`Error sending email to ${email}:`, error);
+    console.error(`Error sending email for domain: ${domain}`, error);
   }
 }
 
-// Send tracking data to all clients
+// Send tracking data to all registered clients
 async function sendTrackingDataToAllClients() {
   try {
-    const registrations = await Registration.find();
+    const registrations = await Registration.find();  // Fetch all registered domains
     const sendPromises = registrations.map(reg => sendTrackingDataToClient(reg.domain, reg.email));
     await Promise.all(sendPromises);
-    console.log('All tracking data sent successfully');
+    console.log('All tracking data emails sent successfully');
   } catch (error) {
-    console.error('Error sending tracking data to all clients:', error);
+    console.error('Error sending tracking data to clients:', error);
   }
 }
 
-// Schedule cron job to send data daily
+// Schedule email job daily at midnight
 cron.schedule('* * * * *', async () => {
   console.log('Running scheduled task to send tracking data...');
   await sendTrackingDataToAllClients();
 });
 
-app.listen(process.env.PORT || 3000, () => {
-  console.log(`Server running on port ${process.env.PORT || 3000}`);
+// Start the server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });

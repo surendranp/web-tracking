@@ -12,7 +12,7 @@ async function getUserIP() {
 async function sendTrackingData(data) {
   const ip = await getUserIP();
   const domain = window.location.hostname;
-  const trackingUrl = 'https://web-tracking-production.up.railway.app/api/pageviews';
+  const trackingUrl = 'https://web-tracking-mongodburi.up.railway.app/api/pageviews';
 
   try {
     const response = await fetch(trackingUrl, {
