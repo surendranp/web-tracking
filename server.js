@@ -29,6 +29,14 @@ mongoose.connect(mongoUri)
     console.error('MongoDB connection error:', err);
     process.exit(1);
   });
+  // --------------------
+// Serve static files
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Import and use routes
+const pageViews = require('./routes/pageViews');
+app.use('/api/pageviews', pageViews);
+// --------------------------
 
 // Function to sanitize the domain to be used as a collection name
 function sanitizeDomain(domain) {
@@ -210,8 +218,8 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/home.html'));
 });
 
-app.get('/tracking.js', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/tracking.js')); 
-});
+// app.get('/tracking.js', (req, res) => {
+//   res.sendFile(path.join(__dirname, 'public/tracking.js')); 
+// });
 
 app.listen(port, () => console.log(`Server running on port ${port}`));
