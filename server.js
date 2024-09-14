@@ -55,6 +55,7 @@ app.post('/api/register', async (req, res) => {
     const registration = new Registration({ domain, email });
     await registration.save();
 
+    // Create a schema and model for the domain's tracking data if it doesn't already exist
     const collectionName = sanitizeDomain(domain);
     if (!mongoose.models[collectionName]) {
       const trackingSchema = new mongoose.Schema({
@@ -91,6 +92,7 @@ app.post('/api/pageviews', async (req, res) => {
   try {
     const collectionName = sanitizeDomain(domain);
 
+    // Ensure the collection is created if it doesn't exist yet
     let Tracking;
     if (mongoose.models[collectionName]) {
       Tracking = mongoose.model(collectionName);
@@ -108,9 +110,11 @@ app.post('/api/pageviews', async (req, res) => {
       Tracking = mongoose.model(collectionName, trackingSchema, collectionName);
     }
 
+    // Find or create a document for the current session and IP
     let trackingData = await Tracking.findOne({ ip, sessionId });
 
     if (!trackingData) {
+      // Create new document if none exists
       trackingData = new Tracking({
         url,
         type,
@@ -119,6 +123,7 @@ app.post('/api/pageviews', async (req, res) => {
         pageviews: type === 'pageview' ? [url] : [],
       });
     } else {
+      // Update existing document based on event type
       if (type === 'pageview') {
         if (!trackingData.pageviews.includes(url)) {
           trackingData.pageviews.push(url);
@@ -132,6 +137,7 @@ app.post('/api/pageviews', async (req, res) => {
       }
     }
 
+    // Save updated tracking data
     await trackingData.save();
 
     res.status(200).send('Tracking data stored successfully');
@@ -145,6 +151,7 @@ app.post('/api/pageviews', async (req, res) => {
 async function sendTrackingDataToClient(domain, email) {
   const collectionName = sanitizeDomain(domain);
 
+  // Reuse existing model or create a new one if necessary
   let Tracking;
   if (mongoose.models[collectionName]) {
     Tracking = mongoose.model(collectionName);
@@ -154,7 +161,7 @@ async function sendTrackingDataToClient(domain, email) {
       type: String,
       ip: String,
       sessionId: String,
-      timestamp: Date,
+      timestamp: { type: Date, default: Date.now },
       buttons: { type: Map, of: Number, default: {} },
       links: { type: Map, of: Number, default: {} },
       pageviews: [String],
@@ -171,30 +178,58 @@ async function sendTrackingDataToClient(domain, email) {
   });
 
   try {
+    // Retrieve all tracking data for the domain
     const trackingData = await Tracking.find().lean();
 
+    // Check if there is any data to send
     if (!trackingData.length) {
       console.log(`No tracking data available for ${domain}`);
       return;
     }
 
+    // Format tracking data for email
     let dataText = `Tracking data for ${domain}:\n\n`;
     trackingData.forEach(doc => {
       dataText += `URL: ${doc.url}\n`;
       dataText += `Type: ${doc.type}\n`;
       dataText += `IP: ${doc.ip}\n`;
       dataText += `Session ID: ${doc.sessionId}\n`;
+      
+      // Fix timestamp issue (if timestamp is not valid, log an appropriate message)
+      if (doc.timestamp && !isNaN(new Date(doc.timestamp))) {
+        dataText += `Timestamp: ${new Date(doc.timestamp).toLocaleString()}\n`;
+      } else {
+        dataText += `Timestamp: No valid timestamp available\n`;
+      }
 
-      const timestamp = doc.timestamp ? new Date(doc.timestamp).toLocaleString() : 'No valid timestamp available';
-      dataText += `Timestamp: ${timestamp}\n`;
-
+      // Handle pageviews
       dataText += `Pageviews: ${doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews'}\n`;
 
-      const buttonsObject = doc.buttons ? Object.fromEntries(doc.buttons.entries()) : {};
-      const linksObject = doc.links ? Object.fromEntries(doc.links.entries()) : {};
+      // Convert buttons map to an object (handling properly)
+      let buttonsObject = {};
+      if (doc.buttons && doc.buttons.size > 0) {
+        buttonsObject = Object.fromEntries(doc.buttons);
+      }
 
-      dataText += `Buttons Clicked: ${Object.keys(buttonsObject).length > 0 ? JSON.stringify(buttonsObject) : 'No button clicks'}\n`;
-      dataText += `Links Clicked: ${Object.keys(linksObject).length > 0 ? JSON.stringify(linksObject) : 'No link clicks'}\n\n`;
+      // Display buttons or no clicks message
+      if (Object.keys(buttonsObject).length > 0) {
+        dataText += `Buttons Clicked: ${JSON.stringify(buttonsObject)}\n`;
+      } else {
+        dataText += `Buttons Clicked: No button clicks\n`;
+      }
+
+      // Convert links map to an object (handling properly)
+      let linksObject = {};
+      if (doc.links && doc.links.size > 0) {
+        linksObject = Object.fromEntries(doc.links);
+      }
+
+      // Display links or no clicks message
+      if (Object.keys(linksObject).length > 0) {
+        dataText += `Links Clicked: ${JSON.stringify(linksObject)}\n\n`;
+      } else {
+        dataText += `Links Clicked: No link clicks\n\n`;
+      }
     });
 
     const mailOptions = {
@@ -221,7 +256,7 @@ async function sendTrackingDataToAllClients() {
 }
 
 // Schedule the task to run every day at 9 AM
-cron.schedule('0/2 * * * *', async () => {
+cron.schedule('* * * * *', async () => {
   console.log('Running scheduled task to send tracking data...');
   await sendTrackingDataToAllClients();
 });
