@@ -161,7 +161,7 @@ async function sendTrackingDataToClient(domain, email) {
       type: String,
       ip: String,
       sessionId: String,
-      timestamp: Date,
+      timestamp: { type: Date, default: Date.now },
       buttons: { type: Map, of: Number, default: {} },
       links: { type: Map, of: Number, default: {} },
       pageviews: [String],
@@ -194,10 +194,18 @@ async function sendTrackingDataToClient(domain, email) {
       dataText += `Type: ${doc.type}\n`;
       dataText += `IP: ${doc.ip}\n`;
       dataText += `Session ID: ${doc.sessionId}\n`;
-      dataText += `Timestamp: ${new Date(doc.timestamp).toLocaleString()}\n`;
+      
+      // Fix timestamp issue (if timestamp is not valid, log an appropriate message)
+      if (doc.timestamp && !isNaN(new Date(doc.timestamp))) {
+        dataText += `Timestamp: ${new Date(doc.timestamp).toLocaleString()}\n`;
+      } else {
+        dataText += `Timestamp: No valid timestamp available\n`;
+      }
+
+      // Handle pageviews
       dataText += `Pageviews: ${doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews'}\n`;
 
-      // Convert buttons map to an object
+      // Convert buttons map to an object (handling properly)
       let buttonsObject = {};
       if (doc.buttons && doc.buttons.size > 0) {
         buttonsObject = Object.fromEntries(doc.buttons);
@@ -210,7 +218,7 @@ async function sendTrackingDataToClient(domain, email) {
         dataText += `Buttons Clicked: No button clicks\n`;
       }
 
-      // Convert links map to an object
+      // Convert links map to an object (handling properly)
       let linksObject = {};
       if (doc.links && doc.links.size > 0) {
         linksObject = Object.fromEntries(doc.links);
@@ -237,9 +245,6 @@ async function sendTrackingDataToClient(domain, email) {
     console.error('Error sending email:', error);
   }
 }
-
-
-
 
 // Function to send tracking data to all registered clients
 async function sendTrackingDataToAllClients() {
