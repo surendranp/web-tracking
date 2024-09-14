@@ -81,19 +81,25 @@ app.post('/api/register', async (req, res) => {
 async function sendTrackingDataToClient(domain, email) {
   const collectionName = domain.replace(/[.\$]/g, '_'); // Sanitize domain name
 
-  // Define the schema based on tracking data structure
-  const trackingSchema = new mongoose.Schema({
-    url: String,
-    type: String,
-    ip: String,
-    sessionId: String,
-    timestamp: Date,
-    buttons: Object,
-    links: Object
-  });
+  // Check if the model already exists and reuse it if it does
+  let Tracking;
+  if (mongoose.models[collectionName]) {
+    Tracking = mongoose.model(collectionName); // Use the existing model
+  } else {
+    // Define the schema based on tracking data structure if the model doesn't exist
+    const trackingSchema = new mongoose.Schema({
+      url: String,
+      type: String,
+      ip: String,
+      sessionId: String,
+      timestamp: Date,
+      buttons: Object,
+      links: Object
+    });
 
-  // Create the model dynamically using the collectionName
-  const Tracking = mongoose.model(collectionName, trackingSchema, collectionName);
+    // Create the model dynamically using the collectionName
+    Tracking = mongoose.model(collectionName, trackingSchema, collectionName);
+  }
 
   const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -138,6 +144,7 @@ async function sendTrackingDataToClient(domain, email) {
     console.error('Error sending email:', error);
   }
 }
+
 
 // Function to send tracking data to all registered clients
 async function sendTrackingDataToAllClients() {
