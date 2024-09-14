@@ -2,11 +2,11 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cron = require('node-cron');
 const nodemailer = require('nodemailer');
-const bodyParser = require('body-parser');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
-app.use(bodyParser.json());
+app.use(express.json());
 
 // MongoDB connection
 mongoose.connect(process.env.MONGO_URI, {
@@ -14,6 +14,14 @@ mongoose.connect(process.env.MONGO_URI, {
   useUnifiedTopology: true,
 }).then(() => console.log('Connected to MongoDB'))
   .catch(err => console.error('MongoDB connection error:', err));
+
+// Serve static files from 'public' directory
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Serve home.html on root route
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'home.html'));
+});
 
 // Define the tracking schema
 const trackingSchema = new mongoose.Schema({
@@ -135,7 +143,7 @@ async function sendTrackingDataToAllClients() {
 }
 
 // Schedule email job daily at midnight
-cron.schedule('* * * * *', async () => {
+cron.schedule('0 0 * * *', async () => {
   console.log('Running scheduled task to send tracking data...');
   await sendTrackingDataToAllClients();
 });
