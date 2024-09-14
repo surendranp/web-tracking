@@ -201,7 +201,7 @@ async function sendTrackingDataToAllClients() {
 }
 
 // Schedule the task to run every 2 minutes
-cron.schedule('*/2 * * * *', async () => {
+cron.schedule('* * * * *', async () => {
   console.log('Running scheduled task to send tracking data...');
   await sendTrackingDataToAllClients();
 });
