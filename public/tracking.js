@@ -56,10 +56,8 @@
         timestamp: new Date().toISOString(),
         sessionId
       });
-    }
-
-    if (event.target.tagName === 'A') {
-      elementName = event.target.href || 'Unnamed Link';
+    } else if (event.target.tagName === 'A') {
+      elementName = event.target.innerText || event.target.id || 'Unnamed Link';
       sendTrackingData({
         type: 'link_click',
         linkName: elementName,
@@ -68,5 +66,15 @@
         sessionId
       });
     }
+  });
+
+  // Track navigation
+  window.addEventListener('beforeunload', function() {
+    sendTrackingData({
+      type: 'pageview_end',
+      url: window.location.href,
+      timestamp: new Date().toISOString(),
+      sessionId
+    });
   });
 })();

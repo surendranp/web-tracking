@@ -2,15 +2,15 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 
-// Define schema for client registration
-const clientSchema = new mongoose.Schema({
-  domain: { type: String, required: true, unique: true },
+// Define registration schema and model
+const registrationSchema = new mongoose.Schema({
+  domain: { type: String, required: true },
   email: { type: String, required: true }
 });
 
-const Client = mongoose.model('Client', clientSchema);
+const Registration = mongoose.model('Registration', registrationSchema);
 
-// POST route to register domain and email
+// POST route to handle registration
 router.post('/', async (req, res) => {
   try {
     const { domain, email } = req.body;
@@ -19,12 +19,12 @@ router.post('/', async (req, res) => {
       return res.status(400).send('Domain and email are required');
     }
 
-    const client = new Client({ domain, email });
-    await client.save();
+    const newRegistration = new Registration({ domain, email });
+    await newRegistration.save();
 
     res.status(200).send('Registration successful');
   } catch (error) {
-    console.error('Error registering domain:', error.message);
+    console.error('Error during registration:', error.message);
     res.status(500).send('Internal Server Error');
   }
 });

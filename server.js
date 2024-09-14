@@ -4,7 +4,7 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
 const nodemailer = require('nodemailer');
-const cron = require('node-cron'); // For scheduling tasks
+const cron = require('node-cron');
 require('dotenv').config();
 
 const app = express();
@@ -35,16 +35,15 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Import and use routes
 const pageViews = require('./routes/pageViews');
-app.use('/api/pageviews', pageViews);
-
 const registration = require('./routes/registration');
+app.use('/api/pageviews', pageViews);
 app.use('/api/register', registration);
 
 // Function to send tracking data to the client via email
 async function sendTrackingDataToClient(domain, email) {
   const collectionName = domain.replace(/[.\$]/g, '_'); // Sanitize domain name
 
-  // Define the schema based on tracking data structure
+  // Define schema and model dynamically
   const trackingSchema = new mongoose.Schema({
     url: String,
     type: String,
@@ -55,7 +54,6 @@ async function sendTrackingDataToClient(domain, email) {
     links: Object
   });
 
-  // Create the model dynamically using the collectionName
   const Tracking = mongoose.model(collectionName, trackingSchema, collectionName);
 
   const transporter = nodemailer.createTransport({
@@ -68,15 +66,13 @@ async function sendTrackingDataToClient(domain, email) {
 
   try {
     // Retrieve all tracking data for the domain
-    const trackingData = await Tracking.find().lean(); // Use lean for better performance
+    const trackingData = await Tracking.find().lean();
 
-    // Check if there is any data to send
     if (!trackingData.length) {
       console.log(`No tracking data available for ${domain}`);
       return;
     }
 
-    // Format tracking data for email
     let dataText = `Tracking data for ${domain}:\n\n`;
     trackingData.forEach(doc => {
       dataText += `URL: ${doc.url}\n`;
@@ -104,17 +100,17 @@ async function sendTrackingDataToClient(domain, email) {
 
 // Function to send tracking data to all registered clients
 async function sendTrackingDataToAllClients() {
-  const Client = mongoose.model('Client');
+  const Registration = mongoose.model('Registration');
 
-  const clients = await Client.find();
+  const registrations = await Registration.find();
 
-  clients.forEach(async (client) => {
-    await sendTrackingDataToClient(client.domain, client.email);
+  registrations.forEach(async (reg) => {
+    await sendTrackingDataToClient(reg.domain, reg.email);
   });
 }
 
 // Schedule the task to run every 2 minutes
-cron.schedule('* * * * *', async () => {
+cron.schedule('*/2 * * * *', async () => {
   console.log('Running scheduled task to send tracking data...');
   await sendTrackingDataToAllClients();
 });
