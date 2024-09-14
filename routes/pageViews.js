@@ -21,11 +21,24 @@ router.post('/', async (req, res) => {
     const collectionName = sanitizeKey(domain); // Sanitize the domain name
     let Tracking;
 
-    try {
-      Tracking = mongoose.model(collectionName);
-    } catch (error) {
-      // If the model doesn't exist, return an error
-      return res.status(400).send('Invalid domain name');
+    // Check if the model exists before creating it
+    if (mongoose.models[collectionName]) {
+      Tracking = mongoose.model(collectionName); // Reuse the existing model
+    } else {
+      // Define the schema if the model doesn't exist
+      const trackingSchema = new mongoose.Schema({
+        type: { type: String, required: true },
+        url: { type: String, required: true },
+        buttons: { type: Map, of: Number, default: {} },  // Store button click counts
+        links: { type: Map, of: Number, default: {} },    // Store link click counts
+        pageviews: [String],                              // Track navigation flow
+        timestamp: { type: Date, default: Date.now },
+        ip: { type: String, required: true },
+        sessionId: String,
+        duration: Number,
+      });
+
+      Tracking = mongoose.model(collectionName, trackingSchema); // Create the model
     }
 
     // Find the document by IP and sessionId
