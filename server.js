@@ -29,14 +29,6 @@ mongoose.connect(mongoUri)
     console.error('MongoDB connection error:', err);
     process.exit(1);
   });
-  // --------------------
-// Serve static files
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Import and use routes
-const pageViews = require('./routes/pageViews');
-app.use('/api/pageviews', pageViews);
-// --------------------------
 
 // Function to sanitize the domain to be used as a collection name
 function sanitizeDomain(domain) {
@@ -48,6 +40,7 @@ const RegistrationSchema = new mongoose.Schema({
   domain: { type: String, required: true, unique: true },
   email: { type: String, required: true }
 });
+
 const Registration = mongoose.models.Registration || mongoose.model('Registration', RegistrationSchema);
 
 // Register route for domain and email
@@ -70,9 +63,10 @@ app.post('/api/register', async (req, res) => {
         type: String,
         ip: String,
         sessionId: String,
-        timestamp: { type: Date, default: Date.now },
-        buttons: Object,
-        links: Object
+        timestamp: Date,
+        buttons: { type: Map, of: Number, default: {} },
+        links: { type: Map, of: Number, default: {} },
+        pageviews: [String],
       });
       mongoose.model(collectionName, trackingSchema, collectionName);
     }
@@ -89,42 +83,64 @@ app.post('/api/register', async (req, res) => {
 
 // Endpoint for tracking script to send data
 app.post('/api/pageviews', async (req, res) => {
-  const { domain, url, type, ip, sessionId, buttons, links } = req.body;
+  const { domain, url, type, ip, sessionId, buttonName, linkName } = req.body;
 
-  if (!domain) {
-    return res.status(400).send('Domain is required.');
+  if (!domain || !url || !ip || !sessionId) {
+    return res.status(400).send('Domain, URL, IP, and Session ID are required.');
   }
 
   try {
     const collectionName = sanitizeDomain(domain);
 
     // Ensure the collection is created if it doesn't exist yet
-    let Tracking = mongoose.models[collectionName];
-    if (!Tracking) {
+    let Tracking;
+    if (mongoose.models[collectionName]) {
+      Tracking = mongoose.model(collectionName);
+    } else {
       const trackingSchema = new mongoose.Schema({
         url: String,
         type: String,
         ip: String,
         sessionId: String,
         timestamp: { type: Date, default: Date.now },
-        buttons: Object,
-        links: Object
+        buttons: { type: Map, of: Number, default: {} },
+        links: { type: Map, of: Number, default: {} },
+        pageviews: [String],
       });
       Tracking = mongoose.model(collectionName, trackingSchema, collectionName);
     }
 
-    // Save the tracking data in the respective domain's collection
-    const trackingData = new Tracking({
-      url,
-      type,
-      ip,
-      sessionId,
-      buttons,
-      links
-    });
+    // Find or create a document for the current session and IP
+    let trackingData = await Tracking.findOne({ ip, sessionId });
 
+    if (!trackingData) {
+      // Create new document if none exists
+      trackingData = new Tracking({
+        url,
+        type,
+        ip,
+        sessionId,
+        pageviews: type === 'pageview' ? [url] : [],
+      });
+    } else {
+      // Update existing document based on event type
+      if (type === 'pageview') {
+        if (!trackingData.pageviews.includes(url)) {
+          trackingData.pageviews.push(url);
+        }
+      } else if (type === 'button_click') {
+        const sanitizedButtonName = buttonName ? buttonName.replace(/[.\$]/g, '_') : 'Unnamed Button';
+        trackingData.buttons.set(sanitizedButtonName, (trackingData.buttons.get(sanitizedButtonName) || 0) + 1);
+      } else if (type === 'link_click') {
+        const sanitizedLinkName = linkName ? linkName.replace(/[.\$]/g, '_') : 'Unnamed Link';
+        trackingData.links.set(sanitizedLinkName, (trackingData.links.get(sanitizedLinkName) || 0) + 1);
+      }
+    }
+
+    // Save updated tracking data
     await trackingData.save();
-    res.status(200).send('Tracking data saved successfully.');
+
+    res.status(200).send('Tracking data stored successfully');
   } catch (error) {
     console.error('Error saving tracking data:', error);
     res.status(500).send('Internal Server Error');
@@ -133,19 +149,22 @@ app.post('/api/pageviews', async (req, res) => {
 
 // Function to send tracking data to the client via email
 async function sendTrackingDataToClient(domain, email) {
-  const collectionName = sanitizeDomain(domain); // Sanitize domain name
+  const collectionName = sanitizeDomain(domain);
 
   // Reuse existing model or create a new one if necessary
-  let Tracking = mongoose.models[collectionName];
-  if (!Tracking) {
+  let Tracking;
+  if (mongoose.models[collectionName]) {
+    Tracking = mongoose.model(collectionName);
+  } else {
     const trackingSchema = new mongoose.Schema({
       url: String,
       type: String,
       ip: String,
       sessionId: String,
       timestamp: Date,
-      buttons: Object,
-      links: Object
+      buttons: { type: Map, of: Number, default: {} },
+      links: { type: Map, of: Number, default: {} },
+      pageviews: [String],
     });
     Tracking = mongoose.model(collectionName, trackingSchema, collectionName);
   }
@@ -176,8 +195,9 @@ async function sendTrackingDataToClient(domain, email) {
       dataText += `IP: ${doc.ip}\n`;
       dataText += `Session ID: ${doc.sessionId}\n`;
       dataText += `Timestamp: ${new Date(doc.timestamp).toLocaleString()}\n`;
-      dataText += `Buttons Clicked: ${JSON.stringify(doc.buttons)}\n`;
-      dataText += `Links Clicked: ${JSON.stringify(doc.links)}\n\n`;
+      dataText += `Pageviews: ${doc.pageviews.join(', ')}\n`;
+      dataText += `Buttons Clicked: ${JSON.stringify(Object.fromEntries(doc.buttons))}\n`;
+      dataText += `Links Clicked: ${JSON.stringify(Object.fromEntries(doc.links))}\n\n`;
     });
 
     const mailOptions = {
