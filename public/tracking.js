@@ -1,13 +1,13 @@
 (function() {
   function getTrackingData() {
     return {
-      type: document.querySelector('meta[name="tracking-type"]').getAttribute('content'),
+      type: document.querySelector('meta[name="tracking-type"]')?.getAttribute('content') || '',
       buttonName: document.querySelector('meta[name="button-name"]')?.getAttribute('content') || '',
       linkName: document.querySelector('meta[name="link-name"]')?.getAttribute('content') || '',
       url: window.location.href,
-      ip: '', // Need to set up a method to get user's IP if required
+      ip: '', // Implement a method to fetch IP if required
       sessionId: getSessionId(),
-      domain: window.location.hostname
+      domain: window.location.hostname // Captures the domain name including subdomains
     };
   }
 
@@ -21,6 +21,8 @@
   }
 
   function sendTrackingData(data) {
+    console.log('Sending tracking data:', data); // Debug log
+
     fetch('https://web-tracking-mongodburi.up.railway.app/api/pageviews', {
       method: 'POST',
       headers: {
