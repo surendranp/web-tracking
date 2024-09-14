@@ -209,6 +209,9 @@ app.get('/dashboard', (req, res) => {
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/home.html'));
 });
+app.get('/tracking.js', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/tracking.js')); // Adjust the path if the file is located elsewhere
+});
 
 
 app.listen(port, () => console.log(`Server running on port ${port}`));
