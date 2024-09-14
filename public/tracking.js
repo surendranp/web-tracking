@@ -1,5 +1,5 @@
 (function() {
-  const trackingUrl = 'https://web-tracking-mongodburi.up.railway.app/api/pageviews';
+  const trackingUrl = 'https://web-tracking-mongodburi.up.railway.app/api/pageviews'; // Replace with your actual API URL
 
   async function getUserIP() {
     try {
@@ -13,59 +13,43 @@
   }
 
   function generateSessionId() {
-    return Math.random().toString(36).substr(2, 9);
+    return Math.random().toString(36).substring(2, 15);
   }
 
-  async function sendTrackingData(data) {
-    const ip = await getUserIP();
-    const domain = window.location.hostname; // Capture the domain name
-    fetch(trackingUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ ...data, ip, domain })
-    }).catch(error => console.error('Error sending tracking data:', error.message));
-  }
+  async function sendTrackingData(type, buttonName = '', linkName = '') {
+    try {
+      const ip = await getUserIP();
+      const sessionId = generateSessionId();
+      const domain = window.location.hostname;
 
-  let sessionId = localStorage.getItem('sessionId') || generateSessionId();
-  localStorage.setItem('sessionId', sessionId);
-
-  function trackPageView() {
-    sendTrackingData({
-      type: 'pageview',
-      url: window.location.href,
-      timestamp: new Date().toISOString(),
-      sessionId
-    });
-  }
-
-  trackPageView(); // Initial page view tracking
-
-  document.addEventListener('click', function(event) {
-    let elementName = 'Unnamed Element';
-
-    if (event.target.tagName === 'BUTTON') {
-      elementName = event.target.innerText || event.target.id || 'Unnamed Button';
-      sendTrackingData({
-        type: 'button_click',
-        buttonName: elementName,
-        url: window.location.href,
-        timestamp: new Date().toISOString(),
-        sessionId
+      await fetch(trackingUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type,
+          buttonName,
+          linkName,
+          url: window.location.href,
+          ip,
+          sessionId,
+          domain
+        })
       });
-    } else if (event.target.tagName === 'A') {
-      elementName = event.target.innerText || event.target.id || 'Unnamed Link';
-      sendTrackingData({
-        type: 'link_click',
-        linkName: elementName,
-        url: window.location.href,
-        timestamp: new Date().toISOString(),
-        sessionId
-      });
+    } catch (error) {
+      console.error('Error sending tracking data:', error.message);
     }
+  }
+
+  // Track page view
+  sendTrackingData('pageview');
+
+  // Track button clicks
+  document.querySelectorAll('button').forEach(button => {
+    button.addEventListener('click', () => sendTrackingData('button_click', button.innerText));
   });
 
-  window.addEventListener('popstate', trackPageView);
-  window.addEventListener('hashchange', trackPageView);
+  // Track link clicks
+  document.querySelectorAll('a').forEach(link => {
+    link.addEventListener('click', () => sendTrackingData('link_click', link.href));
+  });
 })();
