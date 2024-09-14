@@ -57,7 +57,7 @@
         sessionId
       });
     } else if (event.target.tagName === 'A') {
-      elementName = event.target.innerText || event.target.id || 'Unnamed Link';
+      elementName = event.target.href || 'Unnamed Link';
       sendTrackingData({
         type: 'link_click',
         linkName: elementName,
@@ -69,12 +69,6 @@
   });
 
   // Track navigation
-  window.addEventListener('beforeunload', function() {
-    sendTrackingData({
-      type: 'pageview_end',
-      url: window.location.href,
-      timestamp: new Date().toISOString(),
-      sessionId
-    });
-  });
+  window.addEventListener('popstate', trackPageView);
+
 })();
