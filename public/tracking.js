@@ -18,7 +18,7 @@
 
   async function sendTrackingData(data) {
     const ip = await getUserIP();
-    const domain = window.location.hostname; // Get the correct domain from the client-side
+    const domain = window.location.hostname; // Get the domain from the client-side
     fetch(trackingUrl, {
       method: 'POST',
       headers: {

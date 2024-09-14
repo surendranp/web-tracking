@@ -7,6 +7,19 @@ function sanitizeDomain(domain) {
   return domain.replace(/[.\$\/:]/g, '_');
 }
 
+// Define schema once and use it across the application
+const trackingSchema = new mongoose.Schema({
+  type: { type: String, required: true },
+  url: { type: String, required: true },
+  buttons: { type: Map, of: Number, default: {} },
+  links: { type: Map, of: Number, default: {} },
+  pageviews: [String],
+  timestamp: { type: Date, default: Date.now },
+  ip: { type: String, required: true },
+  sessionId: String,
+  duration: Number,
+});
+
 // POST route to collect tracking data
 router.post('/', async (req, res) => {
   try {
@@ -22,28 +35,10 @@ router.post('/', async (req, res) => {
 
     // Avoid recompiling the model if it already exists
     let TrackingModel;
-    try {
+    if (mongoose.models[sanitizedDomain]) {
       TrackingModel = mongoose.model(sanitizedDomain);
-    } catch (error) {
-      if (error.name === 'MissingSchemaError') {
-        // If the model doesn't exist, use the pre-created schema
-        const trackingSchema = new mongoose.Schema({
-          type: { type: String, required: true },
-          url: { type: String, required: true },
-          buttons: { type: Map, of: Number, default: {} },
-          links: { type: Map, of: Number, default: {} },
-          pageviews: [String],
-          timestamp: { type: Date, default: Date.now },
-          ip: { type: String, required: true },
-          sessionId: String,
-          duration: Number,
-        });
-
-        // Create the model based on the domain name (should already exist)
-        TrackingModel = mongoose.model(sanitizedDomain, trackingSchema, sanitizedDomain);
-      } else {
-        throw error;
-      }
+    } else {
+      TrackingModel = mongoose.model(sanitizedDomain, trackingSchema, sanitizedDomain);
     }
 
     // Find or create a document for the current session and IP
