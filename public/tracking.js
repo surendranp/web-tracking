@@ -1,5 +1,5 @@
 (function() {
-  const trackingUrl = 'https://web-tracking-mongodburi.up.railway.app/api/pageviews'; // Your API URL
+  const trackingUrl = 'https://web-tracking-mongodburi.up.railway.app/api/pageviews'; // Replace with your actual API URL
 
   async function getUserIP() {
     try {
@@ -7,7 +7,7 @@
       const data = await response.json();
       return data.ip;
     } catch (error) {
-      console.error('Error fetching IP address:', error);
+      console.error('Error fetching IP address:', error.message);
       return 'unknown';
     }
   }
@@ -18,14 +18,14 @@
 
   async function sendTrackingData(data) {
     const ip = await getUserIP();
-    const domain = window.location.hostname; // Get the domain from the client-side
+    const domain = window.location.hostname;  // Capture the domain name
     fetch(trackingUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ ...data, ip, domain })  // Send domain to server
-    }).catch(error => console.error('Error sending tracking data:', error));
+      body: JSON.stringify({ ...data, ip, domain })  // Send the domain name to the server
+    }).catch(error => console.error('Error sending tracking data:', error.message));
   }
 
   let sessionId = localStorage.getItem('sessionId') || generateSessionId();
