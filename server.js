@@ -46,31 +46,13 @@ app.post('/api/register', async (req, res) => {
   }
 
   try {
-    // Create registration schema and model
-    const registrationSchema = new mongoose.Schema({
-      domain: { type: String, required: true, unique: true },
-      email: { type: String, required: true }
-    });
-    const Registration = mongoose.model('Registration', registrationSchema);
+    const Registration = mongoose.model('Registration', new mongoose.Schema({
+      domain: String,
+      email: String
+    }));
 
-    // Save registration details
     const registration = new Registration({ domain, email });
     await registration.save();
-
-    // Create a collection for the domain
-    const trackingSchema = new mongoose.Schema({
-      type: { type: String, required: true },
-      url: { type: String, required: true },
-      buttons: { type: Map, of: Number, default: {} },
-      links: { type: Map, of: Number, default: {} },
-      pageviews: [String],
-      timestamp: { type: Date, default: Date.now },
-      ip: { type: String, required: true },
-      sessionId: String,
-      duration: Number
-    });
-
-    mongoose.model(domain, trackingSchema);
 
     res.status(200).send('Registration successful.');
   } catch (error) {
@@ -86,7 +68,7 @@ async function sendTrackingDataToClient(domain, email) {
   // Check if the model has already been compiled
   let Tracking;
   if (mongoose.models[collectionName]) {
-    Tracking = mongoose.models[collectionName];
+    Tracking = mongoose.models[collectionName]; // Use existing model
   } else {
     // Define the schema based on tracking data structure
     const trackingSchema = new mongoose.Schema({
@@ -159,7 +141,7 @@ async function sendTrackingDataToAllClients() {
 }
 
 // Schedule the task to run every 2 minutes
-cron.schedule('* * * * *', async () => {
+cron.schedule('*/2 * * * *', async () => {
   console.log('Running scheduled task to send tracking data...');
   await sendTrackingDataToAllClients();
 });

@@ -22,13 +22,13 @@ router.post('/', async (req, res) => {
     const trackingSchema = new mongoose.Schema({
       type: { type: String, required: true },
       url: { type: String, required: true },
-      buttons: { type: Map, of: Number, default: {} },
-      links: { type: Map, of: Number, default: {} },
-      pageviews: [String],
+      buttons: { type: Map, of: Number, default: {} },  // Store button click counts
+      links: { type: Map, of: Number, default: {} },    // Store link click counts
+      pageviews: [String],                              // Track navigation flow
       timestamp: { type: Date, default: Date.now },
       ip: { type: String, required: true },
       sessionId: String,
-      duration: Number
+      duration: Number,
     });
 
     let Tracking;

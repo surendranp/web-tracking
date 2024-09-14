@@ -13,43 +13,62 @@
   }
 
   function generateSessionId() {
-    return Math.random().toString(36).substring(2, 15);
+    return Math.random().toString(36).substr(2, 9);
   }
 
-  async function sendTrackingData(type, buttonName = '', linkName = '') {
-    try {
-      const ip = await getUserIP();
-      const sessionId = generateSessionId();
-      const domain = window.location.hostname;
-
-      await fetch(trackingUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type,
-          buttonName,
-          linkName,
-          url: window.location.href,
-          ip,
-          sessionId,
-          domain
-        })
-      });
-    } catch (error) {
-      console.error('Error sending tracking data:', error.message);
-    }
+  async function sendTrackingData(data) {
+    const ip = await getUserIP();
+    const domain = window.location.hostname;  // Capture the domain name
+    fetch(trackingUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ ...data, ip, domain })  // Send the domain name to the server
+    }).catch(error => console.error('Error sending tracking data:', error.message));
   }
+
+  let sessionId = localStorage.getItem('sessionId') || generateSessionId();
+  localStorage.setItem('sessionId', sessionId);
 
   // Track page view
-  sendTrackingData('pageview');
+  function trackPageView() {
+    sendTrackingData({
+      type: 'pageview',
+      url: window.location.href,
+      timestamp: new Date().toISOString(),
+      sessionId
+    });
+  }
 
-  // Track button clicks
-  document.querySelectorAll('button').forEach(button => {
-    button.addEventListener('click', () => sendTrackingData('button_click', button.innerText));
+  trackPageView(); // Initial page view tracking
+
+  // Track click events
+  document.addEventListener('click', function(event) {
+    let elementName = 'Unnamed Element';
+
+    if (event.target.tagName === 'BUTTON') {
+      elementName = event.target.innerText || event.target.id || 'Unnamed Button';
+      sendTrackingData({
+        type: 'button_click',
+        buttonName: elementName,
+        url: window.location.href,
+        timestamp: new Date().toISOString(),
+        sessionId
+      });
+    } else if (event.target.tagName === 'A') {
+      elementName = event.target.innerText || event.target.id || 'Unnamed Link';
+      sendTrackingData({
+        type: 'link_click',
+        linkName: elementName,
+        url: window.location.href,
+        timestamp: new Date().toISOString(),
+        sessionId
+      });
+    }
   });
 
-  // Track link clicks
-  document.querySelectorAll('a').forEach(link => {
-    link.addEventListener('click', () => sendTrackingData('link_click', link.href));
-  });
+  // Track page navigation (i.e., navigation path)
+  window.addEventListener('popstate', trackPageView);
+  window.addEventListener('hashchange', trackPageView); // For hash-based routing
 })();
