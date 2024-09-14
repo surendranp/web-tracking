@@ -25,7 +25,7 @@
       ip,
       sessionId: generateSessionId(),
       domain
-    };
+    }; 
 
     try {
       await fetch(trackingUrl, {
