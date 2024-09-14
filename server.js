@@ -168,4 +168,4 @@ app.get('/dashboard', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/dashboard.html'));
 });
 
-app.listen(port, () => console.log(`Server running on port ${port}`)); 
+app.listen(port, () => console.log(`Server running on port ${port}`));
