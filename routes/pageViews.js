@@ -7,7 +7,7 @@ function sanitizeKey(key) {
   return key.replace(/[.\$]/g, '_');
 }
 
-// Define a function to get or create a model
+// Function to get or create a tracking model
 function getOrCreateTrackingModel(collectionName) {
   const trackingSchema = new mongoose.Schema({
     type: { type: String, required: true },
@@ -17,11 +17,11 @@ function getOrCreateTrackingModel(collectionName) {
     pageviews: [String],                              // Track navigation flow
     timestamp: { type: Date, default: Date.now },
     ip: { type: String, required: true },
-    sessionId: { type: String, required: true },
+    sessionId: String,
     duration: Number,
   });
 
-  return mongoose.models[collectionName] || mongoose.model(collectionName, trackingSchema, collectionName);
+  return mongoose.model(collectionName, trackingSchema, collectionName);
 }
 
 // POST route to collect tracking data
@@ -35,11 +35,9 @@ router.post('/', async (req, res) => {
       return res.status(400).send('Missing required fields');
     }
 
-    // Create a dynamic collection name based on the domain
     const collectionName = sanitizeKey(domain); // Sanitize the domain name
     const Tracking = getOrCreateTrackingModel(collectionName);
 
-    // Find or create a document
     let trackingData = await Tracking.findOne({ ip, sessionId });
 
     if (!trackingData) {
@@ -52,26 +50,22 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Update pageviews for navigation flow
     if (type === 'pageview') {
       if (!trackingData.pageviews.includes(url)) {
         trackingData.pageviews.push(url);
       }
     }
 
-    // Track button clicks
     if (type === 'button_click') {
       const sanitizedButtonName = sanitizeKey(buttonName || '');
       trackingData.buttons.set(sanitizedButtonName, (trackingData.buttons.get(sanitizedButtonName) || 0) + 1);
     }
 
-    // Track link clicks
     if (type === 'link_click') {
       const sanitizedLinkName = sanitizeKey(linkName || '');
       trackingData.links.set(sanitizedLinkName, (trackingData.links.get(sanitizedLinkName) || 0) + 1);
     }
 
-    // Save updated tracking data
     await trackingData.save();
 
     res.status(200).send('Data received');
