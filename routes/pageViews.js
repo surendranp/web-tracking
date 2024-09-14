@@ -22,9 +22,9 @@ router.post('/', async (req, res) => {
     const trackingSchema = new mongoose.Schema({
       type: { type: String, required: true },
       url: { type: String, required: true },
-      buttons: { type: Map, of: Number, default: {} },  // Store button click counts
-      links: { type: Map, of: Number, default: {} },    // Store link click counts
-      pageviews: [String],                              // Track navigation flow
+      buttons: { type: Map, of: Number, default: {} },
+      links: { type: Map, of: Number, default: {} },
+      pageviews: [String],
       timestamp: { type: Date, default: Date.now },
       ip: { type: String, required: true },
       sessionId: String,
@@ -36,7 +36,7 @@ router.post('/', async (req, res) => {
     try {
       Tracking = mongoose.model(collectionName);
     } catch (error) {
-      Tracking = mongoose.model(collectionName, trackingSchema, collectionName); // Define model only if it does not already exist
+      Tracking = mongoose.model(collectionName, trackingSchema); // Define model only if it does not already exist
     }
 
     // Find the document by IP and sessionId
@@ -81,5 +81,6 @@ router.post('/', async (req, res) => {
     res.status(500).send('Internal Server Error');
   }
 });
+
 
 module.exports = router;
