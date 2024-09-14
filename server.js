@@ -47,32 +47,12 @@ app.post('/api/register', async (req, res) => {
 
   try {
     const Registration = mongoose.model('Registration', new mongoose.Schema({
-      domain: String,
-      email: String
+      domain: { type: String, required: true, unique: true },
+      email: { type: String, required: true }
     }));
-
-    // Check if the domain is already registered
-    const existingRegistration = await Registration.findOne({ domain });
-    if (existingRegistration) {
-      return res.status(400).send('Domain is already registered.');
-    }
 
     const registration = new Registration({ domain, email });
     await registration.save();
-
-    // Create a collection for the domain
-    const collectionName = domain.replace(/[.\$]/g, '_');
-    const trackingSchema = new mongoose.Schema({
-      type: String,
-      url: String,
-      ip: String,
-      sessionId: String,
-      timestamp: Date,
-      buttons: Object,
-      links: Object
-    });
-
-    mongoose.model(collectionName, trackingSchema, collectionName);
 
     res.status(200).send('Registration successful.');
   } catch (error) {
@@ -85,14 +65,19 @@ app.post('/api/register', async (req, res) => {
 async function sendTrackingDataToClient(domain, email) {
   const collectionName = domain.replace(/[.\$]/g, '_'); // Sanitize domain name
 
-  // Check if the model has already been compiled
-  let Tracking;
-  try {
-    Tracking = mongoose.model(collectionName); // Use existing model
-  } catch (error) {
-    console.error('Tracking model not found for domain:', domain);
-    return;
-  }
+  // Define the schema based on tracking data structure
+  const trackingSchema = new mongoose.Schema({
+    url: String,
+    type: String,
+    ip: String,
+    sessionId: String,
+    timestamp: Date,
+    buttons: Object,
+    links: Object
+  });
+
+  // Create the model dynamically using the collectionName
+  const Tracking = mongoose.model(collectionName, trackingSchema, collectionName);
 
   const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -150,7 +135,7 @@ async function sendTrackingDataToAllClients() {
 }
 
 // Schedule the task to run every 2 minutes
-cron.schedule('* * * * *', async () => {
+cron.schedule('*/2 * * * *', async () => {
   console.log('Running scheduled task to send tracking data...');
   await sendTrackingDataToAllClients();
 });
