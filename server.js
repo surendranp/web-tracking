@@ -197,17 +197,23 @@ async function sendTrackingDataToClient(domain, email) {
       dataText += `Timestamp: ${new Date(doc.timestamp).toLocaleString()}\n`;
       dataText += `Pageviews: ${doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews'}\n`;
 
-      // Check and format buttons
-      if (doc.buttons && doc.buttons.size > 0) {
-        const buttonsObject = Object.fromEntries(doc.buttons);
+      // Ensure button clicks are captured properly
+      if (doc.buttons && Object.keys(doc.buttons).length > 0) {
+        const buttonsObject = Array.from(doc.buttons).reduce((acc, [key, value]) => {
+          acc[key] = value;
+          return acc;
+        }, {});
         dataText += `Buttons Clicked: ${JSON.stringify(buttonsObject)}\n`;
       } else {
         dataText += `Buttons Clicked: No button clicks\n`;
       }
 
-      // Check and format links
-      if (doc.links && doc.links.size > 0) {
-        const linksObject = Object.fromEntries(doc.links);
+      // Ensure link clicks are captured properly
+      if (doc.links && Object.keys(doc.links).length > 0) {
+        const linksObject = Array.from(doc.links).reduce((acc, [key, value]) => {
+          acc[key] = value;
+          return acc;
+        }, {});
         dataText += `Links Clicked: ${JSON.stringify(linksObject)}\n\n`;
       } else {
         dataText += `Links Clicked: No link clicks\n\n`;
@@ -227,6 +233,7 @@ async function sendTrackingDataToClient(domain, email) {
     console.error('Error sending email:', error);
   }
 }
+
 
 
 // Function to send tracking data to all registered clients
