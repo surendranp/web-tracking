@@ -141,10 +141,11 @@ app.post('/api/pageviews', async (req, res) => {
   }
 });
 
-// Function to send tracking data to the client via email
+// Function to send tracking data to the client via email with user count and daily tracking details
 async function sendTrackingDataToClient(domain, email) {
   const collectionName = sanitizeDomain(domain);
 
+  // Reuse existing model or create a new one if necessary
   let Tracking;
   if (mongoose.models[collectionName]) {
     Tracking = mongoose.model(collectionName);
@@ -171,49 +172,66 @@ async function sendTrackingDataToClient(domain, email) {
   });
 
   try {
-    const trackingData = await Tracking.find().lean();
+    // Retrieve all tracking data for the domain from the last 24 hours
+    const oneDayAgo = new Date();
+    oneDayAgo.setDate(oneDayAgo.getDate() - 1);
 
+    const trackingData = await Tracking.find({
+      timestamp: { $gte: oneDayAgo }
+    }).lean();
+
+    // Check if there is any data to send
     if (!trackingData.length) {
       console.log(`No tracking data available for ${domain}`);
       return;
     }
 
-    let dataText = `Tracking data for ${domain}:\n\n`;
+    // Find unique users (IP addresses)
+    const uniqueUsers = new Set(trackingData.map(doc => doc.ip));
+    const userCount = uniqueUsers.size;
+
+    // Format tracking data for email
+    let dataText = `Tracking data for ${domain} (Last 24 Hours):\n\n`;
+    dataText += `Total Unique Users: ${userCount}\n\n`;
     trackingData.forEach(doc => {
       dataText += `URL: ${doc.url}\n`;
       dataText += `Type: ${doc.type}\n`;
       dataText += `IP: ${doc.ip}\n`;
       dataText += `Session ID: ${doc.sessionId}\n`;
-
-      const timestamp = doc.timestamp ? new Date(doc.timestamp).toLocaleString() : 'No valid timestamp available';
-      dataText += `Timestamp: ${timestamp}\n`;
-
+      dataText += `Timestamp: ${new Date(doc.timestamp).toLocaleString()}\n`;
       dataText += `Pageviews: ${doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews'}\n`;
 
-      // Convert plain objects (buttons and links)
-      const buttonsObject = doc.buttons || {};
-      const linksObject = doc.links || {};
+      // Ensure button clicks are captured properly
+      const buttonsObject = Array.from(doc.buttons.entries()).reduce((acc, [key, value]) => {
+        acc[key] = value;
+        return acc;
+      }, {});
+      dataText += `Buttons Clicked: ${Object.keys(buttonsObject).length ? JSON.stringify(buttonsObject) : 'No button clicks'}\n`;
 
-      dataText += `Buttons Clicked: ${Object.keys(buttonsObject).length > 0 ? JSON.stringify(buttonsObject) : 'No button clicks'}\n`;
-      dataText += `Links Clicked: ${Object.keys(linksObject).length > 0 ? JSON.stringify(linksObject) : 'No link clicks'}\n\n`;
+      // Ensure link clicks are captured properly
+      const linksObject = Array.from(doc.links.entries()).reduce((acc, [key, value]) => {
+        acc[key] = value;
+        return acc;
+      }, {});
+      dataText += `Links Clicked: ${Object.keys(linksObject).length ? JSON.stringify(linksObject) : 'No link clicks'}\n\n`;
     });
 
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
-      subject: `Tracking Data for ${domain}`,
+      subject: `Daily Tracking Data for ${domain}`,
       text: dataText || 'No tracking data available.'
     };
 
     await transporter.sendMail(mailOptions);
-    console.log(`Tracking data sent to ${email}`);
+    console.log(`Daily tracking data sent to ${email}`);
   } catch (error) {
     console.error('Error sending email:', error);
   }
 }
 
-// Function to send tracking data to all registered clients
-async function sendTrackingDataToAllClients() {
+// Function to send daily tracking data to all registered clients
+async function sendDailyTrackingDataToAllClients() {
   const registrations = await Registration.find();
 
   registrations.forEach(async (reg) => {
@@ -223,9 +241,10 @@ async function sendTrackingDataToAllClients() {
 
 // Schedule the task to run every day at 9 AM
 cron.schedule('0 9 * * *', async () => {
-  console.log('Running scheduled task to send tracking data...');
-  await sendTrackingDataToAllClients();
+  console.log('Running scheduled task to send daily tracking data...');
+  await sendDailyTrackingDataToAllClients();
 });
+
 
 // Serve the dashboard page
 app.get('/dashboard', (req, res) => {
