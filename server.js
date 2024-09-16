@@ -166,7 +166,6 @@ async function sendTrackingDataToClient(domain, email) {
 
     let dataText = `Tracking data for ${domain} (Last 24 Hours):\n\n`;
     dataText += `Total Unique Users: ${userCount}\n\n`;
-
     trackingData.forEach(doc => {
       dataText += `URL: ${doc.url}\n`;
       dataText += `Type: ${doc.type}\n`;
