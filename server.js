@@ -175,13 +175,15 @@ async function sendTrackingDataToClient(domain, email) {
       dataText += `Timestamp: ${new Date(doc.timestamp).toLocaleString()}\n`;
       dataText += `Pageviews: ${doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews'}\n`;
 
-      const buttonsObject = Array.from(doc.buttons.entries()).reduce((acc, [key, value]) => {
+      // Handle buttons clicked
+      const buttonsObject = Object.entries(doc.buttons).reduce((acc, [key, value]) => {
         acc[key] = value;
         return acc;
       }, {});
       dataText += `Buttons Clicked: ${Object.keys(buttonsObject).length ? JSON.stringify(buttonsObject) : 'No button clicks'}\n`;
 
-      const linksObject = Array.from(doc.links.entries()).reduce((acc, [key, value]) => {
+      // Handle links clicked
+      const linksObject = Object.entries(doc.links).reduce((acc, [key, value]) => {
         acc[key] = value;
         return acc;
       }, {});
@@ -201,6 +203,7 @@ async function sendTrackingDataToClient(domain, email) {
     console.error('Error sending email:', error);
   }
 }
+
 
 // Send daily tracking data to all registered clients
 async function sendDailyTrackingDataToAllClients() {
