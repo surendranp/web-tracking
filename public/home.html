@@ -5,118 +5,189 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Tracking Registration</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
-<style>
-  *{
-    margin: 0%;
-    padding: 0%;
-    box-sizing: border-box;
-  }
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
-  .container {
-    width: 100%;
-    max-width: 600px;
-    margin: 0 auto;
-    padding: 20px;
-    background-color: #dc3545; /* Bootstrap bg-danger color */
-    color: white;
-    border-radius: 10px;
-    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
-  }
+    body {
+      font-family: Arial, sans-serif;
+      background-image: url('../images/pexels-irina-iriser-1366957.jpg');
+      background-position: center;
+      background-repeat: no-repeat;
+      background-size: cover;
+      margin: 0;
+      padding: 0;
+      position: relative;
+      height: 100vh;
+    }
 
-  h1, h2 {
-    font-size: 2rem;
-    margin-bottom: 20px;
-    font-weight: bold;
-  }
+    .container {
+      position: absolute;
+      margin: auto;
+      left: 50%;
+      right: 50%;
+      top: 0%;
+      transform: translate(-50%, 50%);
+      padding: 20px;
+      max-width: 600px;
+      border-radius: 10px;
+      background-color: rgba(236, 236, 236, 0.327); /* Semi-transparent for contrast */
+      color: white;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      backdrop-filter: blur(10px); /* Apply blur effect to background */
+    }
 
-  form {
-    margin-top: 20px;
-  }
+    h1 {
+      font-size: 24px;
+      margin-bottom: 20px;
+    }
 
-  label {
-    display: block;
-    text-align: left;
-    margin-bottom: 10px;
-    font-size: 1.1rem;
-  }
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
 
-  input[type="text"], input[type="email"] {
-    width: 100%;
-    padding: 10px;
-    margin-bottom: 20px;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-    font-size: 1rem;
-  }
+    label {
+      font-weight: bold;
+      text-align: left;
+    }
 
-  button[type="submit"] {
-    background-color: #28a745; /* Bootstrap success color */
-    color: white;
-    padding: 10px 20px;
-    border: none;
-    border-radius: 5px;
-    font-size: 1.1rem;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-  }
+    input[type="text"],
+    input[type="email"] {
+      padding: 10px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+      width: 100%;
+    }
 
-  button[type="submit"]:hover {
-    background-color: #218838;
-  }
+    button {
+      background-color: #28a745;
+      color: white;
+      padding: 10px 15px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      align-self: flex-start;
+    }
 
-  #scriptContainer {
-    margin-top: 40px;
-    padding: 20px;
-    background-color: #f8f9fa;
-    border: 1px solid #ccc;
-    border-radius: 10px;
-    color: #333;
-  }
+    button:hover {
+      background-color: #218838;
+    }
 
-  pre {
-    background-color: #e9ecef;
-    padding: 15px;
-    border-radius: 5px;
-    color: #333;
-    font-family: monospace;
-  }
+    #scriptContainer {
+      position: absolute;
+      margin: auto;
+      left: 25%;
+      right: 50%;
+      top: 20%;
+      transform: translate(-50%, 50%);
+      padding: 20px;
+      position: relative;
+      max-width: 800px;
+      background-color: #fff;
+      color: #333;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      z-index: 1000;
+    }
 
-  a {
-    display: inline-block;
-    margin-top: 20px;
-    text-decoration: none;
-    color: #007bff;
-    font-weight: bold;
-    font-size: 1.1rem;
-  }
+    #scriptContainer h2 {
+      font-size: 20px;
+      margin-bottom: 10px;
+    }
 
-  a:hover {
-    text-decoration: underline;
-  }
-</style>
+    pre {
+      background-color: #0c0c0c;
+      padding: 10px;
+      border-radius: 5px;
+      font-size: 14px;
+    }
+
+    .btn-copy {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 8px 12px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .btn-copy:hover {
+      background-color: #0056b3;
+    }
+
+    a {
+      display: inline-block;
+      margin-top: 10px;
+      padding: 10px;
+      background-color: #007bff;
+      color: white;
+      border-radius: 5px;
+      text-decoration: none;
+    }
+
+    a:hover {
+      background-color: #0056b3;
+    }
+  </style>
 </head>
 <body>
-  <div class="container d-flex flex-wrap flex-column text-center mt-5 bg-primary">
-  <h1>Welcome to Tracking Service</h1>
-  <form id="registrationForm">
-    <label for="domain">Domain Name:</label>
-    <input type="text" id="domain" name="domain" required>
-    <br>
-    <label for="email">Email Address:</label>
-    <input type="email" id="email" name="email" required>
-    <br>
-    <button type="submit">Register</button>
+  <div class="container d-flex flex-wrap flex-column text-center">
+    <h1>Welcome to Tracking Service</h1>
+    <form id="registrationForm">
+      <label for="domain">Domain Name:</label>
+      <input type="text" id="domain" name="domain" placeholder="example (amazon_com)" required>
+      <br>
+      <label for="email">Email Address:</label>
+      <input type="email" id="email" name="email" placeholder="example (amazon@'gamil' or 'email'.com)" required>
+      <br>
+      <button type="submit">Register</button>
+    </form>
   </div>
-  </form>
-
+  
   <div id="scriptContainer" style="display:none;">
     <h2>Tracking Script</h2>
-    <p>Include the following script in the `<head>` section of your website:</p>
-    <pre>&lt;script src="https://web-tracking-production.up.railway.app/tracking.js"&gt;&lt;/script&gt;</pre>
-   <a href="home.html">Reload</a>
+    <p>Include the following script in the `head` section of your all pages of the website:</p>
+    <button class="btn-copy" onclick="copyToClipboard()">Copy the Script</button>
+    <pre id="scriptText" class="text-light text-center">&lt;script src="https://web-tracking-production.up.railway.app/tracking.js"&gt;&lt;/script&gt;</pre>
+    <a href="home.html">Close</a>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="copyToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+      <div class="toast-header">
+        <strong class="me-auto">Notification</strong>
+        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+      <div class="toast-body">
+        Script copied to clipboard!
+      </div>
+    </div>
   </div>
 
   <script>
+    function copyToClipboard() {
+      const scriptText = document.getElementById('scriptText').innerText;
+      navigator.clipboard.writeText(scriptText).then(() => {
+        // Show the toast message
+        const toast = new bootstrap.Toast(document.getElementById('copyToast'));
+        toast.show();
+      }).catch(err => {
+        console.error('Failed to copy: ', err);
+      });
+    }
+
+    // Registration
     document.getElementById('registrationForm').addEventListener('submit', function(event) {
       event.preventDefault();
       

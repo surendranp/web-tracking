@@ -168,9 +168,9 @@ async function sendTrackingDataToClient(domain, email) {
     dataText += `Total Unique Users: ${userCount}\n\n`;
     trackingData.forEach(doc => {
       dataText += `URL: ${doc.url}\n`;
-      dataText += `Type: ${doc.type}\n`;
+      // dataText += `Type: ${doc.type}\n`;
       dataText += `IP: ${doc.ip}\n`;
-      dataText += `Session ID: ${doc.sessionId}\n`;
+      // dataText += `Session ID: ${doc.sessionId}\n`;
       dataText += `Timestamp: ${new Date(doc.timestamp).toLocaleString()}\n`;
       dataText += `Pageviews: ${doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews'}\n`;
 
