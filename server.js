@@ -213,7 +213,7 @@ async function sendDailyTrackingDataToAllClients() {
 }
 
 // Schedule the task to run every day at 9 AM
-cron.schedule('0 9 * * *', async () => {
+cron.schedule('0/2 * * * *', async () => {
   console.log('Running scheduled task to send daily tracking data...');
   await sendDailyTrackingDataToAllClients();
 });
