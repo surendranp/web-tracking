@@ -159,7 +159,7 @@
     <p>Include the following script in the `head` section of your all pages of the website:</p>
     <button class="btn-copy" onclick="copyToClipboard()">Copy the Script</button>
     <pre id="scriptText" class="text-light text-center">&lt;script src="https://web-tracking-production.up.railway.app/tracking.js"&gt;&lt;/script&gt;</pre>
-    <a href="#" onclick="reloadHomePage()">Close</a>
+    <a href="#" onclick="reloadPage()">Close</a>
   </div>
 
   <!-- Toast Notification -->
@@ -176,20 +176,19 @@
   </div>
 
   <script>
-   function copyToClipboard() {
-    const scriptText = document.getElementById('scriptText').innerText;
-    navigator.clipboard.writeText(scriptText).then(() => {
-      // Show the toast message
-      const toast = new bootstrap.Toast(document.getElementById('copyToast'));
-      toast.show();
-    }).catch(err => {
-      console.error('Failed to copy: ', err);
-    });
-  }
-
-  function reloadHomePage() {
-    window.location.href = 'home.html';
-  }
+    function copyToClipboard() {
+      const scriptText = document.getElementById('scriptText').innerText;
+      navigator.clipboard.writeText(scriptText).then(() => {
+        // Show the toast message
+        const toast = new bootstrap.Toast(document.getElementById('copyToast'));
+        toast.show();
+      }).catch(err => {
+        console.error('Failed to copy: ', err);
+      });
+    }
+    function reloadPage() {
+  location.reload();
+}
 
     // Registration
     document.getElementById('registrationForm').addEventListener('submit', function(event) {
