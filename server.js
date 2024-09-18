@@ -6,7 +6,8 @@ const path = require('path');
 const nodemailer = require('nodemailer');
 const cron = require('node-cron');
 const fs = require('fs');
-const { Parser } = require('json2csv');  // Import json2csv to convert JSON to CSV
+const { Parser } = require('json2csv');
+const axios = require('axios'); // For geo-location API
 require('dotenv').config();
 
 const app = express();
@@ -27,13 +28,7 @@ function sanitizeDomain(domain) {
   return domain.replace(/[.\$\/:]/g, '_');
 }
 
-const RegistrationSchema = new mongoose.Schema({
-  domain: { type: String, required: true, unique: true },
-  email: { type: String, required: true }
-});
-
-const Registration = mongoose.models.Registration || mongoose.model('Registration', RegistrationSchema);
-
+// Updated Tracking Schema to include geo-location data
 const TrackingSchema = new mongoose.Schema({
   url: String,
   type: String,
@@ -43,11 +38,35 @@ const TrackingSchema = new mongoose.Schema({
   buttons: { type: Map, of: Number, default: {} },
   links: { type: Map, of: Number, default: {} },
   pageviews: [String],
-  sessionStart: { type: Date, default: Date.now },  // Session start time
-  sessionEnd: { type: Date },  // Session end time
+  sessionStart: { type: Date, default: Date.now },
+  sessionEnd: { type: Date },
+  location: {
+    city: String,
+    country: String,
+    region: String
+  } // Geo-location info
 });
 
 const Tracking = mongoose.models.Tracking || mongoose.model('Tracking', TrackingSchema);
+
+const RegistrationSchema = new mongoose.Schema({
+  domain: { type: String, required: true, unique: true },
+  email: { type: String, required: true }
+});
+
+const Registration = mongoose.models.Registration || mongoose.model('Registration', RegistrationSchema);
+
+// Helper function to get geo-location from IP
+async function getGeoLocation(ip) {
+  try {
+    const response = await axios.get(`https://ipapi.co/${ip}/json/`);
+    const { city, country_name: country, region } = response.data;
+    return { city, country, region };
+  } catch (error) {
+    console.error('Error fetching geo-location:', error);
+    return { city: 'Unknown', country: 'Unknown', region: 'Unknown' };
+  }
+}
 
 // Register endpoint
 app.post('/api/register', async (req, res) => {
@@ -71,10 +90,10 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// Tracking endpoint
+// Tracking endpoint with geo-location
 app.post('/api/pageviews', async (req, res) => {
   const { domain, url, type, sessionId, buttonName, linkName } = req.body;
-  const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress; // Get the IP address
+  const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress; 
 
   if (!domain || !url || !ip || !sessionId) {
     return res.status(400).send('Domain, URL, IP, and Session ID are required.');
@@ -88,6 +107,9 @@ app.post('/api/pageviews', async (req, res) => {
       Tracking = mongoose.model(collectionName, TrackingSchema, collectionName);
     }
 
+    // Fetch geo-location data
+    const geoLocation = await getGeoLocation(ip);
+
     let trackingData = await Tracking.findOne({ ip, sessionId });
 
     if (!trackingData) {
@@ -97,7 +119,8 @@ app.post('/api/pageviews', async (req, res) => {
         ip,
         sessionId,
         pageviews: type === 'pageview' ? [url] : [],
-        sessionStart: new Date(),  // Start a new session
+        sessionStart: new Date(),
+        location: geoLocation // Save geo-location data
       });
     } else {
       if (type === 'pageview') {
@@ -111,7 +134,7 @@ app.post('/api/pageviews', async (req, res) => {
         const sanitizedLinkName = linkName ? linkName.replace(/[.\$]/g, '_') : 'Unnamed Link';
         trackingData.links.set(sanitizedLinkName, (trackingData.links.get(sanitizedLinkName) || 0) + 1);
       }
-      trackingData.sessionEnd = new Date();  // Update session end time
+      trackingData.sessionEnd = new Date();
     }
 
     await trackingData.save();
@@ -121,6 +144,9 @@ app.post('/api/pageviews', async (req, res) => {
     res.status(500).send('Internal Server Error');
   }
 });
+
+// Other endpoints and scheduled jobs remain the same...
+
 
 
 // Send tracking data to client via email with CSV attachment
