@@ -122,6 +122,7 @@ app.post('/api/pageviews', async (req, res) => {
 });
 
 // Send tracking data to client via email with CSV attachment
+// Send tracking data to client via email with CSV attachment
 async function sendTrackingDataToClient(domain, email) {
   const collectionName = sanitizeDomain(domain);
   let Tracking = mongoose.models[collectionName];
@@ -161,8 +162,17 @@ async function sendTrackingDataToClient(domain, email) {
 
     trackingData.forEach(doc => {
       totalPageviews += doc.pageviews.length;
-      totalButtonClicks += doc.buttons.size;
-      totalLinkClicks += doc.links.size;
+      
+      // Properly calculate total button clicks by summing up values in the map
+      if (doc.buttons instanceof Map) {
+        totalButtonClicks += [...doc.buttons.values()].reduce((sum, count) => sum + count, 0);
+      }
+
+      // Properly calculate total link clicks by summing up values in the map
+      if (doc.links instanceof Map) {
+        totalLinkClicks += [...doc.links.values()].reduce((sum, count) => sum + count, 0);
+      }
+
       const sessionDuration = (doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart;
       overallDuration += sessionDuration;
     });
@@ -173,8 +183,8 @@ async function sendTrackingDataToClient(domain, email) {
       URL: doc.url,
       Timestamp: new Date(doc.timestamp).toLocaleString(),
       Pageviews: doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews',
-      'Buttons Clicked': Object.keys(doc.buttons).length ? JSON.stringify(Object.fromEntries(doc.buttons)) : 'No button clicks',
-      'Links Clicked': Object.keys(doc.links).length ? JSON.stringify(Object.fromEntries(doc.links)) : 'No link clicks',
+      'Buttons Clicked': Object.keys(Object.fromEntries(doc.buttons)).length ? JSON.stringify(Object.fromEntries(doc.buttons)) : 'No button clicks',
+      'Links Clicked': Object.keys(Object.fromEntries(doc.links)).length ? JSON.stringify(Object.fromEntries(doc.links)) : 'No link clicks',
       'Session Duration (seconds)': Math.floor(((doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart) / 1000)
     }));
 
@@ -199,13 +209,13 @@ async function sendTrackingDataToClient(domain, email) {
       dataText += `Timestamp: ${new Date(doc.timestamp).toLocaleString()}\n`;
       dataText += `Pageviews: ${doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews'}\n`;
 
-      const buttonsObject = Object.entries(doc.buttons).reduce((acc, [key, value]) => {
+      const buttonsObject = Object.entries(Object.fromEntries(doc.buttons)).reduce((acc, [key, value]) => {
         acc[key] = value;
         return acc;
       }, {});
       dataText += `Buttons Clicked: ${Object.keys(buttonsObject).length ? JSON.stringify(buttonsObject) : 'No button clicks'}\n`;
 
-      const linksObject = Object.entries(doc.links).reduce((acc, [key, value]) => {
+      const linksObject = Object.entries(Object.fromEntries(doc.links)).reduce((acc, [key, value]) => {
         acc[key] = value;
         return acc;
       }, {});
@@ -236,6 +246,7 @@ async function sendTrackingDataToClient(domain, email) {
     console.error('Error sending email:', error);
   }
 }
+
 
 // Send daily tracking data to all registered clients
 async function sendDailyTrackingDataToAllClients() {
