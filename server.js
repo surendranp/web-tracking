@@ -74,9 +74,12 @@ app.post('/api/pageviews', async (req, res) => {
 
   try {
     const collectionName = sanitizeDomain(domain);
-    let Tracking = mongoose.models[collectionName];
 
-    if (!Tracking) {
+    // Ensure the collection is created if it doesn't exist yet
+    let Tracking;
+    if (mongoose.models[collectionName]) {
+      Tracking = mongoose.model(collectionName);
+    } else {
       const trackingSchema = new mongoose.Schema({
         url: String,
         type: String,
@@ -90,36 +93,55 @@ app.post('/api/pageviews', async (req, res) => {
       Tracking = mongoose.model(collectionName, trackingSchema, collectionName);
     }
 
-    let trackingData = await Tracking.findOne({ ip, sessionId });
+    // Find an existing document with the same IP or Session ID
+    let trackingData = await Tracking.findOne({ $or: [{ ip }, { sessionId }] });
+
     if (!trackingData) {
+      // If no document exists, create a new one
       trackingData = new Tracking({
         url,
         type,
         ip,
         sessionId,
         pageviews: type === 'pageview' ? [url] : [],
+        timestamp: new Date(),
       });
     } else {
-      if (type === 'pageview') {
-        if (!trackingData.pageviews.includes(url)) {
-          trackingData.pageviews.push(url);
-        }
-      } else if (type === 'button_click') {
-        const sanitizedButtonName = buttonName ? buttonName.replace(/[.\$]/g, '_') : 'Unnamed Button';
-        trackingData.buttons.set(sanitizedButtonName, (trackingData.buttons.get(sanitizedButtonName) || 0) + 1);
-      } else if (type === 'link_click') {
-        const sanitizedLinkName = linkName ? linkName.replace(/[.\$]/g, '_') : 'Unnamed Link';
-        trackingData.links.set(sanitizedLinkName, (trackingData.links.get(sanitizedLinkName) || 0) + 1);
+      // If document exists, merge the new data with the existing data
+
+      // Merge pageviews
+      if (type === 'pageview' && !trackingData.pageviews.includes(url)) {
+        trackingData.pageviews.push(url);
       }
+
+      // Merge button clicks
+      if (type === 'button_click' && buttonName) {
+        const sanitizedButtonName = buttonName.replace(/[.\$]/g, '_');
+        const currentButtonClicks = trackingData.buttons.get(sanitizedButtonName) || 0;
+        trackingData.buttons.set(sanitizedButtonName, currentButtonClicks + 1);
+      }
+
+      // Merge link clicks
+      if (type === 'link_click' && linkName) {
+        const sanitizedLinkName = linkName.replace(/[.\$]/g, '_');
+        const currentLinkClicks = trackingData.links.get(sanitizedLinkName) || 0;
+        trackingData.links.set(sanitizedLinkName, currentLinkClicks + 1);
+      }
+
+      // Update the timestamp
+      trackingData.timestamp = new Date();
     }
 
+    // Save the updated document
     await trackingData.save();
-    res.status(200).send('Tracking data stored successfully');
+
+    res.status(200).send('Tracking data updated successfully.');
   } catch (error) {
     console.error('Error saving tracking data:', error);
     res.status(500).send('Internal Server Error');
   }
 });
+
 
 // Send tracking data to client via email with user count and daily tracking details
 async function sendTrackingDataToClient(domain, email) {
@@ -213,7 +235,7 @@ async function sendDailyTrackingDataToAllClients() {
 }
 
 // Schedule the task to run every day at 9 AM
-cron.schedule('0 9 * * *', async () => {
+cron.schedule('*/2 * * * *', async () => {
   console.log('Running scheduled task to send daily tracking data...');
   await sendDailyTrackingDataToAllClients();
 });
