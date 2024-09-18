@@ -163,7 +163,7 @@ async function sendTrackingDataToClient(domain, email) {
     trackingData.forEach(doc => {
       totalPageviews += doc.pageviews.length;
 
-      // Check if `buttons` and `links` are objects (since .lean() turns them into regular objects)
+      // Re-define `buttonClicks` and `linkClicks` inside the loop
       const buttonClicks = doc.buttons instanceof Map ? doc.buttons : new Map(Object.entries(doc.buttons));
       totalButtonClicks += [...buttonClicks.values()].reduce((sum, count) => sum + count, 0);
 
@@ -207,15 +207,15 @@ async function sendTrackingDataToClient(domain, email) {
     dataText += `Overall Duration for All Users: ${Math.floor(overallDuration / 1000)} seconds\n\n`;
 
     trackingData.forEach(doc => {
+      // Define buttonClicks and linkClicks again for each document
+      const buttonClicks = doc.buttons instanceof Map ? doc.buttons : new Map(Object.entries(doc.buttons));
+      const linksObject = doc.links instanceof Map ? doc.links : new Map(Object.entries(doc.links));
+
       dataText += `URL: ${doc.url}\n`;
       dataText += `Timestamp: ${new Date(doc.timestamp).toLocaleString()}\n`;
       dataText += `Pageviews: ${doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews'}\n`;
-
-      const buttonsObject = Object.fromEntries(buttonClicks);
-      dataText += `Buttons Clicked: ${Object.keys(buttonsObject).length ? JSON.stringify(buttonsObject) : 'No button clicks'}\n`;
-
-      const linksObject = Object.fromEntries(linkClicks);
-      dataText += `Links Clicked: ${Object.keys(linksObject).length ? JSON.stringify(linksObject) : 'No link clicks'}\n\n`;
+      dataText += `Buttons Clicked: ${Object.keys(Object.fromEntries(buttonClicks)).length ? JSON.stringify(Object.fromEntries(buttonClicks)) : 'No button clicks'}\n`;
+      dataText += `Links Clicked: ${Object.keys(Object.fromEntries(linksObject)).length ? JSON.stringify(Object.fromEntries(linksObject)) : 'No link clicks'}\n\n`;
     });
 
     // Email options with attachment
@@ -244,6 +244,7 @@ async function sendTrackingDataToClient(domain, email) {
 }
 
 
+
 // Send daily tracking data to all registered clients
 async function sendDailyTrackingDataToAllClients() {
   const registrations = await Registration.find({});
@@ -253,7 +254,7 @@ async function sendDailyTrackingDataToAllClients() {
 }
 
 // Schedule daily email at 9 AM Indian Time
-cron.schedule('*/3 * * * *', async () => {
+cron.schedule('*/2 * * * *', async () => {
   console.log('Sending daily tracking data...');
   await sendDailyTrackingDataToAllClients();
 }, {
