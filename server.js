@@ -5,6 +5,8 @@ const cors = require('cors');
 const path = require('path');
 const nodemailer = require('nodemailer');
 const cron = require('node-cron');
+const fs = require('fs');
+const { Parser } = require('json2csv');  // Import json2csv to convert JSON to CSV
 require('dotenv').config();
 
 const app = express();
@@ -32,6 +34,21 @@ const RegistrationSchema = new mongoose.Schema({
 
 const Registration = mongoose.models.Registration || mongoose.model('Registration', RegistrationSchema);
 
+const TrackingSchema = new mongoose.Schema({
+  url: String,
+  type: String,
+  ip: String,
+  sessionId: String,
+  timestamp: { type: Date, default: Date.now },
+  buttons: { type: Map, of: Number, default: {} },
+  links: { type: Map, of: Number, default: {} },
+  pageviews: [String],
+  sessionStart: { type: Date, default: Date.now },  // Session start time
+  sessionEnd: { type: Date },  // Session end time
+});
+
+const Tracking = mongoose.models.Tracking || mongoose.model('Tracking', TrackingSchema);
+
 // Register endpoint
 app.post('/api/register', async (req, res) => {
   const { domain, email } = req.body;
@@ -41,17 +58,7 @@ app.post('/api/register', async (req, res) => {
     const collectionName = sanitizeDomain(domain);
 
     if (!mongoose.models[collectionName]) {
-      const trackingSchema = new mongoose.Schema({
-        url: String,
-        type: String,
-        ip: String,
-        sessionId: String,
-        timestamp: Date,
-        buttons: { type: Map, of: Number, default: {} },
-        links: { type: Map, of: Number, default: {} },
-        pageviews: [String],
-      });
-      mongoose.model(collectionName, trackingSchema, collectionName);
+      mongoose.model(collectionName, TrackingSchema, collectionName);
     }
 
     res.status(200).send('Registration successful.');
@@ -66,7 +73,8 @@ app.post('/api/register', async (req, res) => {
 
 // Tracking endpoint
 app.post('/api/pageviews', async (req, res) => {
-  const { domain, url, type, ip, sessionId, buttonName, linkName } = req.body;
+  const { domain, url, type, sessionId, buttonName, linkName } = req.body;
+  const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress; // Get the IP address
 
   if (!domain || !url || !ip || !sessionId) {
     return res.status(400).send('Domain, URL, IP, and Session ID are required.');
@@ -74,94 +82,54 @@ app.post('/api/pageviews', async (req, res) => {
 
   try {
     const collectionName = sanitizeDomain(domain);
+    let Tracking = mongoose.models[collectionName];
 
-    // Ensure the collection is created if it doesn't exist yet
-    let Tracking;
-    if (mongoose.models[collectionName]) {
-      Tracking = mongoose.model(collectionName);
-    } else {
-      const trackingSchema = new mongoose.Schema({
-        url: String,
-        type: String,
-        ip: String,
-        sessionId: String,
-        timestamp: { type: Date, default: Date.now },
-        buttons: { type: Map, of: Number, default: {} },
-        links: { type: Map, of: Number, default: {} },
-        pageviews: [String],
-      });
-      Tracking = mongoose.model(collectionName, trackingSchema, collectionName);
+    if (!Tracking) {
+      Tracking = mongoose.model(collectionName, TrackingSchema, collectionName);
     }
 
-    // Find an existing document with the same IP or Session ID
-    let trackingData = await Tracking.findOne({ $or: [{ ip }, { sessionId }] });
+    let trackingData = await Tracking.findOne({ ip, sessionId });
 
     if (!trackingData) {
-      // If no document exists, create a new one
       trackingData = new Tracking({
         url,
         type,
         ip,
         sessionId,
         pageviews: type === 'pageview' ? [url] : [],
-        timestamp: new Date(),
+        sessionStart: new Date(),  // Start a new session
       });
     } else {
-      // If document exists, merge the new data with the existing data
-
-      // Merge pageviews
-      if (type === 'pageview' && !trackingData.pageviews.includes(url)) {
-        trackingData.pageviews.push(url);
+      if (type === 'pageview') {
+        if (!trackingData.pageviews.includes(url)) {
+          trackingData.pageviews.push(url);
+        }
+      } else if (type === 'button_click') {
+        const sanitizedButtonName = buttonName ? buttonName.replace(/[.\$]/g, '_') : 'Unnamed Button';
+        trackingData.buttons.set(sanitizedButtonName, (trackingData.buttons.get(sanitizedButtonName) || 0) + 1);
+      } else if (type === 'link_click') {
+        const sanitizedLinkName = linkName ? linkName.replace(/[.\$]/g, '_') : 'Unnamed Link';
+        trackingData.links.set(sanitizedLinkName, (trackingData.links.get(sanitizedLinkName) || 0) + 1);
       }
-
-      // Merge button clicks
-      if (type === 'button_click' && buttonName) {
-        const sanitizedButtonName = buttonName.replace(/[.\$]/g, '_');
-        const currentButtonClicks = trackingData.buttons.get(sanitizedButtonName) || 0;
-        trackingData.buttons.set(sanitizedButtonName, currentButtonClicks + 1);
-      }
-
-      // Merge link clicks
-      if (type === 'link_click' && linkName) {
-        const sanitizedLinkName = linkName.replace(/[.\$]/g, '_');
-        const currentLinkClicks = trackingData.links.get(sanitizedLinkName) || 0;
-        trackingData.links.set(sanitizedLinkName, currentLinkClicks + 1);
-      }
-
-      // Update the timestamp
-      trackingData.timestamp = new Date();
+      trackingData.sessionEnd = new Date();  // Update session end time
     }
 
-    // Save the updated document
     await trackingData.save();
-
-    res.status(200).send('Tracking data updated successfully.');
+    res.status(200).send('Tracking data stored successfully');
   } catch (error) {
     console.error('Error saving tracking data:', error);
     res.status(500).send('Internal Server Error');
   }
 });
 
-// Function to send tracking data to the client via email
-async function sendDailyTrackingDataToClient(domain, email) {
-  const collectionName = sanitizeDomain(domain);
 
-  // Reuse existing model or create a new one if necessary
-  let Tracking;
-  if (mongoose.models[collectionName]) {
-    Tracking = mongoose.model(collectionName);
-  } else {
-    const trackingSchema = new mongoose.Schema({
-      url: String,
-      type: String,
-      ip: String,
-      sessionId: String,
-      timestamp: { type: Date, default: Date.now },
-      buttons: { type: Map, of: Number, default: {} },
-      links: { type: Map, of: Number, default: {} },
-      pageviews: [String],
-    });
-    Tracking = mongoose.model(collectionName, trackingSchema, collectionName);
+// Send tracking data to client via email with CSV attachment
+async function sendTrackingDataToClient(domain, email) {
+  const collectionName = sanitizeDomain(domain);
+  let Tracking = mongoose.models[collectionName];
+
+  if (!Tracking) {
+    Tracking = mongoose.model(collectionName, TrackingSchema, collectionName);
   }
 
   const transporter = nodemailer.createTransport({
@@ -173,85 +141,128 @@ async function sendDailyTrackingDataToClient(domain, email) {
   });
 
   try {
-    // Get today's date (at midnight) and tomorrow's date for range filtering
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);  // Set time to midnight (start of the day)
-    const tomorrow = new Date(today);
-    tomorrow.setDate(today.getDate() + 1);  // Set time to midnight (start of the next day)
+    const oneDayAgo = new Date();
+    oneDayAgo.setDate(oneDayAgo.getDate() - 1);
 
-    // Retrieve all tracking data for the domain from the last 24 hours
     const trackingData = await Tracking.find({
-      timestamp: { $gte: today, $lt: tomorrow }
+      timestamp: { $gte: oneDayAgo }
     }).lean();
 
-    // Check if there is any data to send
     if (!trackingData.length) {
-      console.log(`No tracking data available for ${domain} within the last 24 hours`);
+      console.log(`No tracking data available for ${domain}`);
       return;
     }
 
-    // Format tracking data for email
-    let dataText = `Tracking data for ${domain} from the last 24 hours:\n\n`;
+    // Calculate unique users based on IP addresses
+    const uniqueUsers = new Set(trackingData.map(doc => doc.ip));
+    const userCount = uniqueUsers.size;
+
+    let totalPageviews = 0;
+    let totalButtonClicks = 0;
+    let totalLinkClicks = 0;
+    let overallDuration = 0;
+
     trackingData.forEach(doc => {
-      dataText += `URL: ${doc.url}\n`;
-      dataText += `Type: ${doc.type}\n`;
-      dataText += `IP: ${doc.ip}\n`;
-      dataText += `Session ID: ${doc.sessionId}\n`;
-      dataText += `Timestamp: ${new Date(doc.timestamp).toLocaleString()}\n`;
-      dataText += `Pageviews: ${doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews'}\n`;
+      totalPageviews += doc.pageviews.length;
 
-      // Ensure button clicks are captured properly
-      if (doc.buttons && Object.keys(doc.buttons).length > 0) {
-        const buttonsObject = Array.from(doc.buttons).reduce((acc, [key, value]) => {
-          acc[key] = value;
-          return acc;
-        }, {});
-        dataText += `Buttons Clicked: ${JSON.stringify(buttonsObject)}\n`;
-      } else {
-        dataText += `Buttons Clicked: No button clicks\n`;
-      }
+      const buttonClicks = doc.buttons instanceof Map ? doc.buttons : new Map(Object.entries(doc.buttons));
+      totalButtonClicks += [...buttonClicks.values()].reduce((sum, count) => sum + count, 0);
 
-      // Ensure link clicks are captured properly
-      if (doc.links && Object.keys(doc.links).length > 0) {
-        const linksObject = Array.from(doc.links).reduce((acc, [key, value]) => {
-          acc[key] = value;
-          return acc;
-        }, {});
-        dataText += `Links Clicked: ${JSON.stringify(linksObject)}\n\n`;
-      } else {
-        dataText += `Links Clicked: No link clicks\n\n`;
-      }
+      const linkClicks = doc.links instanceof Map ? doc.links : new Map(Object.entries(doc.links));
+      totalLinkClicks += [...linkClicks.values()].reduce((sum, count) => sum + count, 0);
+
+      const sessionDuration = (doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart;
+      overallDuration += sessionDuration;
     });
 
+    // Prepare data for CSV
+    const csvFields = ['URL', 'Timestamp', 'Pageviews', 'Buttons Clicked', 'Links Clicked', 'Session Duration (seconds)'];
+    const csvData = trackingData.map(doc => {
+      const buttonClicks = doc.buttons instanceof Map ? doc.buttons : new Map(Object.entries(doc.buttons));
+      const linkClicks = doc.links instanceof Map ? doc.links : new Map(Object.entries(doc.links));
+
+      return {
+        URL: doc.url,
+        Timestamp: new Date(doc.timestamp).toLocaleString(),
+        Pageviews: doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews',
+        'Buttons Clicked': Object.keys(Object.fromEntries(buttonClicks)).length ? JSON.stringify(Object.fromEntries(buttonClicks)) : 'No button clicks',
+        'Links Clicked': Object.keys(Object.fromEntries(linkClicks)).length ? JSON.stringify(Object.fromEntries(linkClicks)) : 'No link clicks',
+        'Session Duration (seconds)': Math.floor(((doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart) / 1000)
+      };
+    });
+
+    // Convert JSON data to CSV
+    const json2csvParser = new Parser({ fields: csvFields });
+    const csv = json2csvParser.parse(csvData);
+
+    // Write CSV to a file (temporary file location)
+    const filePath = `./daily_tracking_${domain}.csv`;
+    fs.writeFileSync(filePath, csv);
+
+    // Email content
+    let dataText = `Tracking data for ${domain} (Last 24 Hours):\n\n`;
+    dataText += `Total Unique Users: ${userCount}\n`;
+    dataText += `Total Pageviews: ${totalPageviews}\n`;
+    dataText += `Total Button Clicks: ${totalButtonClicks}\n`;
+    dataText += `Total Link Clicks: ${totalLinkClicks}\n`;
+    dataText += `Overall Duration for All Users: ${Math.floor(overallDuration / 1000)} seconds\n\n`;
+
+    trackingData.forEach(doc => {
+      const buttonClicks = doc.buttons instanceof Map ? doc.buttons : new Map(Object.entries(doc.buttons));
+      const linksObject = doc.links instanceof Map ? doc.links : new Map(Object.entries(doc.links));
+
+      dataText += `URL: ${doc.url}\n`;
+      dataText += `Timestamp: ${new Date(doc.timestamp).toLocaleString()}\n`;
+      dataText += `Pageviews: ${doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews'}\n`;
+      dataText += `Buttons Clicked: ${Object.keys(Object.fromEntries(buttonClicks)).length ? JSON.stringify(Object.fromEntries(buttonClicks)) : 'No button clicks'}\n`;
+      dataText += `Links Clicked: ${Object.keys(Object.fromEntries(linksObject)).length ? JSON.stringify(Object.fromEntries(linksObject)) : 'No link clicks'}\n\n`;
+    });
+
+    // Email options with attachment
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
       subject: `Daily Tracking Data for ${domain}`,
-      text: dataText || 'No tracking data available for today.'
+      text: dataText || 'No tracking data available.',
+      attachments: [
+        {
+          filename: `daily_tracking_${domain}.csv`,
+          path: filePath
+        }
+      ]
     };
 
+    // Send email
     await transporter.sendMail(mailOptions);
-    console.log(`Daily tracking data sent to ${email}`);
+    console.log(`Daily tracking data with CSV attachment sent to ${email}`);
+
+    // Clean up the CSV file after sending the email
+    fs.unlinkSync(filePath);
   } catch (error) {
     console.error('Error sending email:', error);
   }
 }
 
-// Function to send tracking data to all registered clients (daily)
-async function sendDailyTrackingDataToAllClients() {
-  const registrations = await Registration.find();
 
-  registrations.forEach(async (reg) => {
-    await sendDailyTrackingDataToClient(reg.domain, reg.email);
-  });
+// Send daily tracking data to all registered clients
+async function sendDailyTrackingDataToAllClients() {
+  try {
+    const registrations = await Registration.find({});
+    for (const { domain, email } of registrations) {
+      await sendTrackingDataToClient(domain, email);
+    }
+  } catch (error) {
+    console.error('Error sending daily tracking data to clients:', error);
+  }
 }
 
-// Schedule the task to run every day at 9 AM
-cron.schedule('*/3 * * * *', async () => {  // Runs daily at 9 AM
-  console.log('Running scheduled task to send daily tracking data...');
+// Schedule daily email at 9 AM Indian Time
+cron.schedule('*/3 * * * *', async () => {
+  console.log('Sending daily tracking data...');
   await sendDailyTrackingDataToAllClients();
+}, {
+  timezone: 'Asia/Kolkata'
 });
-
 // Serve dashboard page
 app.get('/dashboard', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/dashboard.html'));
@@ -265,5 +276,6 @@ app.get('/', (req, res) => {
 app.get('/tracking.js', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/tracking.js'));
 });
-
-app.listen(port, () => console.log(`Server running on port ${port}`));
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
+});
