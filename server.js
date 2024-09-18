@@ -7,7 +7,7 @@ const nodemailer = require('nodemailer');
 const cron = require('node-cron');
 const fs = require('fs');
 const { Parser } = require('json2csv');
-const axios = require('axios'); // For geo-location API
+const axios = require('axios');  // For geo-location API
 require('dotenv').config();
 
 const app = express();
@@ -38,13 +38,13 @@ const TrackingSchema = new mongoose.Schema({
   buttons: { type: Map, of: Number, default: {} },
   links: { type: Map, of: Number, default: {} },
   pageviews: [String],
-  sessionStart: { type: Date, default: Date.now },
-  sessionEnd: { type: Date },
+  sessionStart: { type: Date, default: Date.now },  // Session start time
+  sessionEnd: { type: Date },  // Session end time
   location: {
     city: String,
     country: String,
     region: String
-  } // Geo-location info
+  }  // Geo-location info
 });
 
 const Tracking = mongoose.models.Tracking || mongoose.model('Tracking', TrackingSchema);
@@ -93,7 +93,7 @@ app.post('/api/register', async (req, res) => {
 // Tracking endpoint with geo-location
 app.post('/api/pageviews', async (req, res) => {
   const { domain, url, type, sessionId, buttonName, linkName } = req.body;
-  const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress; 
+  const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
 
   if (!domain || !url || !ip || !sessionId) {
     return res.status(400).send('Domain, URL, IP, and Session ID are required.');
@@ -119,8 +119,8 @@ app.post('/api/pageviews', async (req, res) => {
         ip,
         sessionId,
         pageviews: type === 'pageview' ? [url] : [],
-        sessionStart: new Date(),
-        location: geoLocation // Save geo-location data
+        sessionStart: new Date(),  // Start a new session
+        location: geoLocation  // Save geo-location data
       });
     } else {
       if (type === 'pageview') {
@@ -134,7 +134,7 @@ app.post('/api/pageviews', async (req, res) => {
         const sanitizedLinkName = linkName ? linkName.replace(/[.\$]/g, '_') : 'Unnamed Link';
         trackingData.links.set(sanitizedLinkName, (trackingData.links.get(sanitizedLinkName) || 0) + 1);
       }
-      trackingData.sessionEnd = new Date();
+      trackingData.sessionEnd = new Date();  // Update session end time
     }
 
     await trackingData.save();
@@ -144,10 +144,6 @@ app.post('/api/pageviews', async (req, res) => {
     res.status(500).send('Internal Server Error');
   }
 });
-
-// Other endpoints and scheduled jobs remain the same...
-
-
 
 // Send tracking data to client via email with CSV attachment
 async function sendTrackingDataToClient(domain, email) {
@@ -202,7 +198,7 @@ async function sendTrackingDataToClient(domain, email) {
     });
 
     // Prepare data for CSV
-    const csvFields = ['URL', 'Timestamp', 'Pageviews', 'Buttons Clicked', 'Links Clicked', 'Session Duration (seconds)'];
+    const csvFields = ['URL', 'Timestamp', 'Pageviews', 'Buttons Clicked', 'Links Clicked', 'Session Duration (seconds)', 'City', 'Country', 'Region'];
     const csvData = trackingData.map(doc => {
       const buttonClicks = doc.buttons instanceof Map ? doc.buttons : new Map(Object.entries(doc.buttons));
       const linkClicks = doc.links instanceof Map ? doc.links : new Map(Object.entries(doc.links));
@@ -213,7 +209,10 @@ async function sendTrackingDataToClient(domain, email) {
         Pageviews: doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews',
         'Buttons Clicked': Object.keys(Object.fromEntries(buttonClicks)).length ? JSON.stringify(Object.fromEntries(buttonClicks)) : 'No button clicks',
         'Links Clicked': Object.keys(Object.fromEntries(linkClicks)).length ? JSON.stringify(Object.fromEntries(linkClicks)) : 'No link clicks',
-        'Session Duration (seconds)': Math.floor(((doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart) / 1000)
+        'Session Duration (seconds)': Math.floor(((doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart) / 1000),
+        City: doc.location.city || 'Unknown',
+        Country: doc.location.country || 'Unknown',
+        Region: doc.location.region || 'Unknown'
       };
     });
 
@@ -223,7 +222,7 @@ async function sendTrackingDataToClient(domain, email) {
 
     // Write CSV to a file (temporary file location)
     const filePath = `./daily_tracking_${domain}.csv`;
-    fs.writeFileSync(filePath, csv);
+    fs.writeFileSync(filePath);
 
     // Email content
     let dataText = `Tracking data for ${domain} (Last 24 Hours):\n\n`;
@@ -235,21 +234,24 @@ async function sendTrackingDataToClient(domain, email) {
 
     trackingData.forEach(doc => {
       const buttonClicks = doc.buttons instanceof Map ? doc.buttons : new Map(Object.entries(doc.buttons));
-      const linksObject = doc.links instanceof Map ? doc.links : new Map(Object.entries(doc.links));
+      const linkClicks = doc.links instanceof Map ? doc.links : new Map(Object.entries(doc.links));
 
       dataText += `URL: ${doc.url}\n`;
       dataText += `Timestamp: ${new Date(doc.timestamp).toLocaleString()}\n`;
       dataText += `Pageviews: ${doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews'}\n`;
       dataText += `Buttons Clicked: ${Object.keys(Object.fromEntries(buttonClicks)).length ? JSON.stringify(Object.fromEntries(buttonClicks)) : 'No button clicks'}\n`;
-      dataText += `Links Clicked: ${Object.keys(Object.fromEntries(linksObject)).length ? JSON.stringify(Object.fromEntries(linksObject)) : 'No link clicks'}\n\n`;
+      dataText += `Links Clicked: ${Object.keys(Object.fromEntries(linkClicks)).length ? JSON.stringify(Object.fromEntries(linkClicks)) : 'No link clicks'}\n`;
+      dataText += `Session Duration (seconds): ${Math.floor(((doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart) / 1000)}\n`;
+      dataText += `City: ${doc.location.city || 'Unknown'}\n`;
+      dataText += `Country: ${doc.location.country || 'Unknown'}\n`;
+      dataText += `Region: ${doc.location.region || 'Unknown'}\n\n`;
     });
 
-    // Email options with attachment
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
-      subject: `Daily Tracking Data for ${domain}`,
-      text: dataText || 'No tracking data available.',
+      subject: `Daily Tracking Report for ${domain}`,
+      text: dataText,
       attachments: [
         {
           filename: `daily_tracking_${domain}.csv`,
@@ -258,50 +260,25 @@ async function sendTrackingDataToClient(domain, email) {
       ]
     };
 
-    // Send email
     await transporter.sendMail(mailOptions);
-    console.log(`Daily tracking data with CSV attachment sent to ${email}`);
-
-    // Clean up the CSV file after sending the email
-    fs.unlinkSync(filePath);
+    console.log(`Daily tracking email sent to ${email}`);
+    fs.unlinkSync(filePath);  // Remove the file after sending the email
   } catch (error) {
-    console.error('Error sending email:', error);
+    console.error(`Error sending tracking data email to ${email}:`, error);
   }
 }
 
-
-// Send daily tracking data to all registered clients
-async function sendDailyTrackingDataToAllClients() {
-  try {
-    const registrations = await Registration.find({});
-    for (const { domain, email } of registrations) {
-      await sendTrackingDataToClient(domain, email);
-    }
-  } catch (error) {
-    console.error('Error sending daily tracking data to clients:', error);
-  }
-}
-
-// Schedule daily email at 9 AM Indian Time
-cron.schedule('0 3 * * *', async () => {
-  console.log('Sending daily tracking data...');
-  await sendDailyTrackingDataToAllClients();
+// Scheduled job to run every day at 9 AM Indian Time
+cron.schedule('0/3  * * *', async () => {
+  const registrations = await Registration.find({}).lean();
+  registrations.forEach(async ({ domain, email }) => {
+    await sendTrackingDataToClient(domain, email);
+  });
 }, {
+  scheduled: true,
   timezone: 'Asia/Kolkata'
 });
-// Serve dashboard page
-app.get('/dashboard', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/dashboard.html'));
-});
 
-// Serve other pages
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/home.html'));
-});
-
-app.get('/tracking.js', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/tracking.js'));
-});
 app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+  console.log(`Server running on port ${port}`);
 });
