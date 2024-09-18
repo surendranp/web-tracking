@@ -122,7 +122,6 @@ app.post('/api/pageviews', async (req, res) => {
 });
 
 // Send tracking data to client via email with CSV attachment
-// Send tracking data to client via email with CSV attachment
 async function sendTrackingDataToClient(domain, email) {
   const collectionName = sanitizeDomain(domain);
   let Tracking = mongoose.models[collectionName];
@@ -163,7 +162,6 @@ async function sendTrackingDataToClient(domain, email) {
     trackingData.forEach(doc => {
       totalPageviews += doc.pageviews.length;
 
-      // Re-define `buttonClicks` and `linkClicks` inside the loop
       const buttonClicks = doc.buttons instanceof Map ? doc.buttons : new Map(Object.entries(doc.buttons));
       totalButtonClicks += [...buttonClicks.values()].reduce((sum, count) => sum + count, 0);
 
@@ -207,7 +205,6 @@ async function sendTrackingDataToClient(domain, email) {
     dataText += `Overall Duration for All Users: ${Math.floor(overallDuration / 1000)} seconds\n\n`;
 
     trackingData.forEach(doc => {
-      // Define buttonClicks and linkClicks again for each document
       const buttonClicks = doc.buttons instanceof Map ? doc.buttons : new Map(Object.entries(doc.buttons));
       const linksObject = doc.links instanceof Map ? doc.links : new Map(Object.entries(doc.links));
 
@@ -243,13 +240,15 @@ async function sendTrackingDataToClient(domain, email) {
   }
 }
 
-
-
 // Send daily tracking data to all registered clients
 async function sendDailyTrackingDataToAllClients() {
-  const registrations = await Registration.find({});
-  for (const { domain, email } of registrations) {
-    await sendTrackingDataToClient(domain, email);
+  try {
+    const registrations = await Registration.find({});
+    for (const { domain, email } of registrations) {
+      await sendTrackingDataToClient(domain, email);
+    }
+  } catch (error) {
+    console.error('Error sending daily tracking data to clients:', error);
   }
 }
 
