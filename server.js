@@ -278,7 +278,19 @@ cron.schedule('0 9 * * *', async () => {
   scheduled: true,
   timezone: 'Asia/Kolkata'
 });
+// Serve dashboard page
+app.get('/dashboard', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/dashboard.html'));
+});
 
+// Serve other pages
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/home.html'));
+});
+
+app.get('/tracking.js', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/tracking.js'));
+});
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
