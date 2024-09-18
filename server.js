@@ -46,6 +46,8 @@ app.post('/api/register', async (req, res) => {
         type: String,
         ip: String,
         sessionId: String,
+        sessionStart: { type: Date, default: Date.now },  // Session start time
+        sessionEnd: { type: Date },  // Session end time (updated when user leaves)
         timestamp: Date,
         buttons: { type: Map, of: Number, default: {} },
         links: { type: Map, of: Number, default: {} },
@@ -74,8 +76,6 @@ app.post('/api/pageviews', async (req, res) => {
 
   try {
     const collectionName = sanitizeDomain(domain);
-
-    // Ensure the collection is created if it doesn't exist yet
     let Tracking;
     if (mongoose.models[collectionName]) {
       Tracking = mongoose.model(collectionName);
@@ -85,6 +85,8 @@ app.post('/api/pageviews', async (req, res) => {
         type: String,
         ip: String,
         sessionId: String,
+        sessionStart: { type: Date, default: Date.now },  // Track session start
+        sessionEnd: { type: Date },  // Track session end
         timestamp: { type: Date, default: Date.now },
         buttons: { type: Map, of: Number, default: {} },
         links: { type: Map, of: Number, default: {} },
@@ -93,7 +95,6 @@ app.post('/api/pageviews', async (req, res) => {
       Tracking = mongoose.model(collectionName, trackingSchema, collectionName);
     }
 
-    // Find an existing document with the same IP or Session ID
     let trackingData = await Tracking.findOne({ $or: [{ ip }, { sessionId }] });
 
     if (!trackingData) {
@@ -104,37 +105,29 @@ app.post('/api/pageviews', async (req, res) => {
         ip,
         sessionId,
         pageviews: type === 'pageview' ? [url] : [],
-        timestamp: new Date(),
+        sessionStart: new Date(),  // Start a new session
       });
     } else {
-      // If document exists, merge the new data with the existing data
-
-      // Merge pageviews
+      // Merge pageviews, button clicks, and links (similar to earlier code)
+      // Update session end time to current time
+      trackingData.sessionEnd = new Date();
+      
       if (type === 'pageview' && !trackingData.pageviews.includes(url)) {
         trackingData.pageviews.push(url);
       }
-
-      // Merge button clicks
       if (type === 'button_click' && buttonName) {
         const sanitizedButtonName = buttonName.replace(/[.\$]/g, '_');
         const currentButtonClicks = trackingData.buttons.get(sanitizedButtonName) || 0;
         trackingData.buttons.set(sanitizedButtonName, currentButtonClicks + 1);
       }
-
-      // Merge link clicks
       if (type === 'link_click' && linkName) {
         const sanitizedLinkName = linkName.replace(/[.\$]/g, '_');
         const currentLinkClicks = trackingData.links.get(sanitizedLinkName) || 0;
         trackingData.links.set(sanitizedLinkName, currentLinkClicks + 1);
       }
-
-      // Update the timestamp
-      trackingData.timestamp = new Date();
     }
 
-    // Save the updated document
     await trackingData.save();
-
     res.status(200).send('Tracking data updated successfully.');
   } catch (error) {
     console.error('Error saving tracking data:', error);
@@ -142,11 +135,11 @@ app.post('/api/pageviews', async (req, res) => {
   }
 });
 
+
 // Function to send tracking data to the client via email
 async function sendDailyTrackingDataToClient(domain, email) {
   const collectionName = sanitizeDomain(domain);
 
-  // Reuse existing model or create a new one if necessary
   let Tracking;
   if (mongoose.models[collectionName]) {
     Tracking = mongoose.model(collectionName);
@@ -156,6 +149,8 @@ async function sendDailyTrackingDataToClient(domain, email) {
       type: String,
       ip: String,
       sessionId: String,
+      sessionStart: { type: Date, default: Date.now },
+      sessionEnd: { type: Date },
       timestamp: { type: Date, default: Date.now },
       buttons: { type: Map, of: Number, default: {} },
       links: { type: Map, of: Number, default: {} },
@@ -173,34 +168,34 @@ async function sendDailyTrackingDataToClient(domain, email) {
   });
 
   try {
-    // Get today's date (at midnight) and tomorrow's date for range filtering
     const today = new Date();
-    today.setHours(0, 0, 0, 0);  // Set time to midnight (start of the day)
+    today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
-    tomorrow.setDate(today.getDate() + 1);  // Set time to midnight (start of the next day)
+    tomorrow.setDate(today.getDate() + 1);
 
-    // Retrieve all tracking data for the domain from the last 24 hours
     const trackingData = await Tracking.find({
       timestamp: { $gte: today, $lt: tomorrow }
     }).lean();
 
-    // Check if there is any data to send
     if (!trackingData.length) {
       console.log(`No tracking data available for ${domain} within the last 24 hours`);
       return;
     }
 
-    // Format tracking data for email
     let dataText = `Tracking data for ${domain} from the last 24 hours:\n\n`;
+    let overallDuration = 0;  // Initialize overall duration
+
     trackingData.forEach(doc => {
+      const sessionDuration = (doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart;
+      overallDuration += sessionDuration;  // Add to the overall duration
+      
       dataText += `URL: ${doc.url}\n`;
-      dataText += `Type: ${doc.type}\n`;
       dataText += `IP: ${doc.ip}\n`;
       dataText += `Session ID: ${doc.sessionId}\n`;
+      dataText += `Session Duration: ${Math.floor(sessionDuration / 1000)} seconds\n`;  // Duration in seconds
       dataText += `Timestamp: ${new Date(doc.timestamp).toLocaleString()}\n`;
       dataText += `Pageviews: ${doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews'}\n`;
 
-      // Ensure button clicks are captured properly
       if (doc.buttons && Object.keys(doc.buttons).length > 0) {
         const buttonsObject = Array.from(doc.buttons).reduce((acc, [key, value]) => {
           acc[key] = value;
@@ -211,7 +206,6 @@ async function sendDailyTrackingDataToClient(domain, email) {
         dataText += `Buttons Clicked: No button clicks\n`;
       }
 
-      // Ensure link clicks are captured properly
       if (doc.links && Object.keys(doc.links).length > 0) {
         const linksObject = Array.from(doc.links).reduce((acc, [key, value]) => {
           acc[key] = value;
@@ -223,11 +217,14 @@ async function sendDailyTrackingDataToClient(domain, email) {
       }
     });
 
+    // Add overall duration to the email
+    dataText += `\nOverall Duration for All Users: ${Math.floor(overallDuration / 1000)} seconds\n`;
+
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
       subject: `Daily Tracking Data for ${domain}`,
-      text: dataText || 'No tracking data available for today.'
+      text: dataText
     };
 
     await transporter.sendMail(mailOptions);
@@ -236,6 +233,7 @@ async function sendDailyTrackingDataToClient(domain, email) {
     console.error('Error sending email:', error);
   }
 }
+
 
 // Function to send tracking data to all registered clients (daily)
 async function sendDailyTrackingDataToAllClients() {
