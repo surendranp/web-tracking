@@ -162,16 +162,13 @@ async function sendTrackingDataToClient(domain, email) {
 
     trackingData.forEach(doc => {
       totalPageviews += doc.pageviews.length;
-      
-      // Properly calculate total button clicks by summing up values in the map
-      if (doc.buttons instanceof Map) {
-        totalButtonClicks += [...doc.buttons.values()].reduce((sum, count) => sum + count, 0);
-      }
 
-      // Properly calculate total link clicks by summing up values in the map
-      if (doc.links instanceof Map) {
-        totalLinkClicks += [...doc.links.values()].reduce((sum, count) => sum + count, 0);
-      }
+      // Check if `buttons` and `links` are objects (since .lean() turns them into regular objects)
+      const buttonClicks = doc.buttons instanceof Map ? doc.buttons : new Map(Object.entries(doc.buttons));
+      totalButtonClicks += [...buttonClicks.values()].reduce((sum, count) => sum + count, 0);
+
+      const linkClicks = doc.links instanceof Map ? doc.links : new Map(Object.entries(doc.links));
+      totalLinkClicks += [...linkClicks.values()].reduce((sum, count) => sum + count, 0);
 
       const sessionDuration = (doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart;
       overallDuration += sessionDuration;
@@ -179,14 +176,19 @@ async function sendTrackingDataToClient(domain, email) {
 
     // Prepare data for CSV
     const csvFields = ['URL', 'Timestamp', 'Pageviews', 'Buttons Clicked', 'Links Clicked', 'Session Duration (seconds)'];
-    const csvData = trackingData.map(doc => ({
-      URL: doc.url,
-      Timestamp: new Date(doc.timestamp).toLocaleString(),
-      Pageviews: doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews',
-      'Buttons Clicked': Object.keys(Object.fromEntries(doc.buttons)).length ? JSON.stringify(Object.fromEntries(doc.buttons)) : 'No button clicks',
-      'Links Clicked': Object.keys(Object.fromEntries(doc.links)).length ? JSON.stringify(Object.fromEntries(doc.links)) : 'No link clicks',
-      'Session Duration (seconds)': Math.floor(((doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart) / 1000)
-    }));
+    const csvData = trackingData.map(doc => {
+      const buttonClicks = doc.buttons instanceof Map ? doc.buttons : new Map(Object.entries(doc.buttons));
+      const linkClicks = doc.links instanceof Map ? doc.links : new Map(Object.entries(doc.links));
+
+      return {
+        URL: doc.url,
+        Timestamp: new Date(doc.timestamp).toLocaleString(),
+        Pageviews: doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews',
+        'Buttons Clicked': Object.keys(Object.fromEntries(buttonClicks)).length ? JSON.stringify(Object.fromEntries(buttonClicks)) : 'No button clicks',
+        'Links Clicked': Object.keys(Object.fromEntries(linkClicks)).length ? JSON.stringify(Object.fromEntries(linkClicks)) : 'No link clicks',
+        'Session Duration (seconds)': Math.floor(((doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart) / 1000)
+      };
+    });
 
     // Convert JSON data to CSV
     const json2csvParser = new Parser({ fields: csvFields });
@@ -209,16 +211,10 @@ async function sendTrackingDataToClient(domain, email) {
       dataText += `Timestamp: ${new Date(doc.timestamp).toLocaleString()}\n`;
       dataText += `Pageviews: ${doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews'}\n`;
 
-      const buttonsObject = Object.entries(Object.fromEntries(doc.buttons)).reduce((acc, [key, value]) => {
-        acc[key] = value;
-        return acc;
-      }, {});
+      const buttonsObject = Object.fromEntries(buttonClicks);
       dataText += `Buttons Clicked: ${Object.keys(buttonsObject).length ? JSON.stringify(buttonsObject) : 'No button clicks'}\n`;
 
-      const linksObject = Object.entries(Object.fromEntries(doc.links)).reduce((acc, [key, value]) => {
-        acc[key] = value;
-        return acc;
-      }, {});
+      const linksObject = Object.fromEntries(linkClicks);
       dataText += `Links Clicked: ${Object.keys(linksObject).length ? JSON.stringify(linksObject) : 'No link clicks'}\n\n`;
     });
 
