@@ -32,6 +32,14 @@ const RegistrationSchema = new mongoose.Schema({
 
 const Registration = mongoose.models.Registration || mongoose.model('Registration', RegistrationSchema);
 
+// New Schema for IP Tracking
+const IPTrackingSchema = new mongoose.Schema({
+  ip: { type: String, required: true, unique: true },
+  lastActivity: { type: Date, default: Date.now }
+});
+
+const IPTracking = mongoose.models.IPTracking || mongoose.model('IPTracking', IPTrackingSchema);
+
 // Register endpoint
 app.post('/api/register', async (req, res) => {
   const { domain, email } = req.body;
@@ -46,8 +54,8 @@ app.post('/api/register', async (req, res) => {
         type: String,
         ip: String,
         sessionId: String,
-        sessionStart: { type: Date, default: Date.now },  // Session start time
-        sessionEnd: { type: Date },  // Session end time (updated when user leaves)
+        sessionStart: { type: Date, default: Date.now },
+        sessionEnd: { type: Date },
         timestamp: Date,
         buttons: { type: Map, of: Number, default: {} },
         links: { type: Map, of: Number, default: {} },
@@ -85,8 +93,8 @@ app.post('/api/pageviews', async (req, res) => {
         type: String,
         ip: String,
         sessionId: String,
-        sessionStart: { type: Date, default: Date.now },  // Track session start
-        sessionEnd: { type: Date },  // Track session end
+        sessionStart: { type: Date, default: Date.now },
+        sessionEnd: { type: Date },
         timestamp: { type: Date, default: Date.now },
         buttons: { type: Map, of: Number, default: {} },
         links: { type: Map, of: Number, default: {} },
@@ -95,21 +103,25 @@ app.post('/api/pageviews', async (req, res) => {
       Tracking = mongoose.model(collectionName, trackingSchema, collectionName);
     }
 
+    // Update or create IP entry
+    await IPTracking.findOneAndUpdate(
+      { ip },
+      { lastActivity: new Date() },
+      { upsert: true, new: true }
+    );
+
     let trackingData = await Tracking.findOne({ $or: [{ ip }, { sessionId }] });
 
     if (!trackingData) {
-      // If no document exists, create a new one
       trackingData = new Tracking({
         url,
         type,
         ip,
         sessionId,
         pageviews: type === 'pageview' ? [url] : [],
-        sessionStart: new Date(),  // Start a new session
+        sessionStart: new Date(),
       });
     } else {
-      // Merge pageviews, button clicks, and links (similar to earlier code)
-      // Update session end time to current time
       trackingData.sessionEnd = new Date();
       
       if (type === 'pageview' && !trackingData.pageviews.includes(url)) {
@@ -134,7 +146,6 @@ app.post('/api/pageviews', async (req, res) => {
     res.status(500).send('Internal Server Error');
   }
 });
-
 
 // Function to send tracking data to the client via email
 async function sendDailyTrackingDataToClient(domain, email) {
@@ -177,22 +188,27 @@ async function sendDailyTrackingDataToClient(domain, email) {
       timestamp: { $gte: today, $lt: tomorrow }
     }).lean();
 
+    // Count unique IPs
+    const uniqueIPs = await IPTracking.distinct('ip', {
+      lastActivity: { $gte: today, $lt: tomorrow }
+    });
+
     if (!trackingData.length) {
       console.log(`No tracking data available for ${domain} within the last 24 hours`);
       return;
     }
 
     let dataText = `Tracking data for ${domain} from the last 24 hours:\n\n`;
-    let overallDuration = 0;  // Initialize overall duration
+    let overallDuration = 0;
 
     trackingData.forEach(doc => {
       const sessionDuration = (doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart;
-      overallDuration += sessionDuration;  // Add to the overall duration
-      
+      overallDuration += sessionDuration;
+
       dataText += `URL: ${doc.url}\n`;
       dataText += `IP: ${doc.ip}\n`;
       dataText += `Session ID: ${doc.sessionId}\n`;
-      dataText += `Session Duration: ${Math.floor(sessionDuration / 1000)} seconds\n`;  // Duration in seconds
+      dataText += `Session Duration: ${Math.floor(sessionDuration / 1000)} seconds\n`;
       dataText += `Timestamp: ${new Date(doc.timestamp).toLocaleString()}\n`;
       dataText += `Pageviews: ${doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews'}\n`;
 
@@ -217,8 +233,9 @@ async function sendDailyTrackingDataToClient(domain, email) {
       }
     });
 
-    // Add overall duration to the email
+    // Add overall duration and unique user count to the email
     dataText += `\nOverall Duration for All Users: ${Math.floor(overallDuration / 1000)} seconds\n`;
+    dataText += `Unique Users: ${uniqueIPs.length}\n`;
 
     const mailOptions = {
       from: process.env.EMAIL_USER,
@@ -234,7 +251,6 @@ async function sendDailyTrackingDataToClient(domain, email) {
   }
 }
 
-
 // Function to send tracking data to all registered clients (daily)
 async function sendDailyTrackingDataToAllClients() {
   const registrations = await Registration.find();
@@ -244,24 +260,12 @@ async function sendDailyTrackingDataToAllClients() {
   });
 }
 
-// Schedule the task to run every day at 9 AM
-cron.schedule('*/1 * * * *', async () => {  // Runs daily at 9 AM
-  console.log('Running scheduled task to send daily tracking data...');
-  await sendDailyTrackingDataToAllClients();
+// Schedule daily email sending at midnight (adjust timezone if needed)
+cron.schedule('*/2 * * * *', () => {
+  console.log('Sending daily tracking data to clients...');
+  sendDailyTrackingDataToAllClients();
 });
 
-// Serve dashboard page
-app.get('/dashboard', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/dashboard.html'));
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
 });
-
-// Serve other pages
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/home.html'));
-});
-
-app.get('/tracking.js', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/tracking.js'));
-});
-
-app.listen(port, () => console.log(`Server running on port ${port}`));
