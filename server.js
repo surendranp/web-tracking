@@ -142,6 +142,7 @@ async function sendTrackingDataToClient(domain, email) {
     const oneDayAgo = new Date();
     oneDayAgo.setDate(oneDayAgo.getDate() - 1);
 
+    // Fetch tracking data for the last 24 hours
     const trackingData = await Tracking.find({
       timestamp: { $gte: oneDayAgo }
     }).lean();
@@ -151,6 +152,7 @@ async function sendTrackingDataToClient(domain, email) {
       return;
     }
 
+    // Calculate unique users based on IP addresses
     const uniqueUsers = new Set(trackingData.map(doc => doc.ip));
     const userCount = uniqueUsers.size;
 
@@ -253,7 +255,7 @@ async function sendDailyTrackingDataToAllClients() {
 }
 
 // Schedule daily email at 9 AM Indian Time
-cron.schedule('0 3 * * *', async () => {
+cron.schedule('*/3 * * * *', async () => {
   console.log('Sending daily tracking data...');
   await sendDailyTrackingDataToAllClients();
 }, {
