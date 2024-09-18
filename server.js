@@ -32,6 +32,21 @@ const RegistrationSchema = new mongoose.Schema({
 
 const Registration = mongoose.models.Registration || mongoose.model('Registration', RegistrationSchema);
 
+const TrackingSchema = new mongoose.Schema({
+  url: String,
+  type: String,
+  ip: String,
+  sessionId: String,
+  timestamp: { type: Date, default: Date.now },
+  buttons: { type: Map, of: Number, default: {} },
+  links: { type: Map, of: Number, default: {} },
+  pageviews: [String],
+  sessionStart: { type: Date, default: Date.now },  // Add session start time
+  sessionEnd: { type: Date },  // Add session end time
+});
+
+const Tracking = mongoose.models.Tracking || mongoose.model('Tracking', TrackingSchema);
+
 // Register endpoint
 app.post('/api/register', async (req, res) => {
   const { domain, email } = req.body;
@@ -41,17 +56,7 @@ app.post('/api/register', async (req, res) => {
     const collectionName = sanitizeDomain(domain);
 
     if (!mongoose.models[collectionName]) {
-      const trackingSchema = new mongoose.Schema({
-        url: String,
-        type: String,
-        ip: String,
-        sessionId: String,
-        timestamp: Date,
-        buttons: { type: Map, of: Number, default: {} },
-        links: { type: Map, of: Number, default: {} },
-        pageviews: [String],
-      });
-      mongoose.model(collectionName, trackingSchema, collectionName);
+      mongoose.model(collectionName, TrackingSchema, collectionName);
     }
 
     res.status(200).send('Registration successful.');
@@ -77,20 +82,11 @@ app.post('/api/pageviews', async (req, res) => {
     let Tracking = mongoose.models[collectionName];
 
     if (!Tracking) {
-      const trackingSchema = new mongoose.Schema({
-        url: String,
-        type: String,
-        ip: String,
-        sessionId: String,
-        timestamp: { type: Date, default: Date.now },
-        buttons: { type: Map, of: Number, default: {} },
-        links: { type: Map, of: Number, default: {} },
-        pageviews: [String],
-      });
-      Tracking = mongoose.model(collectionName, trackingSchema, collectionName);
+      Tracking = mongoose.model(collectionName, TrackingSchema, collectionName);
     }
 
     let trackingData = await Tracking.findOne({ ip, sessionId });
+
     if (!trackingData) {
       trackingData = new Tracking({
         url,
@@ -98,6 +94,7 @@ app.post('/api/pageviews', async (req, res) => {
         ip,
         sessionId,
         pageviews: type === 'pageview' ? [url] : [],
+        sessionStart: new Date(),  // Start a new session
       });
     } else {
       if (type === 'pageview') {
@@ -111,6 +108,7 @@ app.post('/api/pageviews', async (req, res) => {
         const sanitizedLinkName = linkName ? linkName.replace(/[.\$]/g, '_') : 'Unnamed Link';
         trackingData.links.set(sanitizedLinkName, (trackingData.links.get(sanitizedLinkName) || 0) + 1);
       }
+      trackingData.sessionEnd = new Date();  // Update session end time
     }
 
     await trackingData.save();
@@ -127,17 +125,7 @@ async function sendTrackingDataToClient(domain, email) {
   let Tracking = mongoose.models[collectionName];
 
   if (!Tracking) {
-    const trackingSchema = new mongoose.Schema({
-      url: String,
-      type: String,
-      ip: String,
-      sessionId: String,
-      timestamp: { type: Date, default: Date.now },
-      buttons: { type: Map, of: Number, default: {} },
-      links: { type: Map, of: Number, default: {} },
-      pageviews: [String],
-    });
-    Tracking = mongoose.model(collectionName, trackingSchema, collectionName);
+    Tracking = mongoose.model(collectionName, TrackingSchema, collectionName);
   }
 
   const transporter = nodemailer.createTransport({
@@ -164,24 +152,37 @@ async function sendTrackingDataToClient(domain, email) {
     const uniqueUsers = new Set(trackingData.map(doc => doc.ip));
     const userCount = uniqueUsers.size;
 
+    let totalPageviews = 0;
+    let totalButtonClicks = 0;
+    let totalLinkClicks = 0;
+    let overallDuration = 0;
+
+    trackingData.forEach(doc => {
+      totalPageviews += doc.pageviews.length;
+      totalButtonClicks += doc.buttons.size;
+      totalLinkClicks += doc.links.size;
+      const sessionDuration = (doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart;
+      overallDuration += sessionDuration;
+    });
+
     let dataText = `Tracking data for ${domain} (Last 24 Hours):\n\n`;
-    dataText += `Total Unique Users: ${userCount}\n\n`;
+    dataText += `Total Unique Users: ${userCount}\n`;
+    dataText += `Total Pageviews: ${totalPageviews}\n`;
+    dataText += `Total Button Clicks: ${totalButtonClicks}\n`;
+    dataText += `Total Link Clicks: ${totalLinkClicks}\n`;
+    dataText += `Overall Duration for All Users: ${Math.floor(overallDuration / 1000)} seconds\n\n`;
+
     trackingData.forEach(doc => {
       dataText += `URL: ${doc.url}\n`;
-      dataText += `Type: ${doc.type}\n`;
-      dataText += `IP: ${doc.ip}\n`;
-      dataText += `Session ID: ${doc.sessionId}\n`;
       dataText += `Timestamp: ${new Date(doc.timestamp).toLocaleString()}\n`;
       dataText += `Pageviews: ${doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews'}\n`;
 
-      // Handle buttons clicked
       const buttonsObject = Object.entries(doc.buttons).reduce((acc, [key, value]) => {
         acc[key] = value;
         return acc;
       }, {});
       dataText += `Buttons Clicked: ${Object.keys(buttonsObject).length ? JSON.stringify(buttonsObject) : 'No button clicks'}\n`;
 
-      // Handle links clicked
       const linksObject = Object.entries(doc.links).reduce((acc, [key, value]) => {
         acc[key] = value;
         return acc;
@@ -203,7 +204,6 @@ async function sendTrackingDataToClient(domain, email) {
   }
 }
 
-
 // Send daily tracking data to all registered clients
 async function sendDailyTrackingDataToAllClients() {
   const registrations = await Registration.find();
@@ -212,8 +212,8 @@ async function sendDailyTrackingDataToAllClients() {
   });
 }
 
-// Schedule the task to run every day at 9 AM
-cron.schedule('*/3 * * * *', async () => {
+// Schedule the task to run every day at 9 AM IST
+cron.schedule('0 3 * * *', async () => {  // 9 AM IST is 3:30 AM UTC; adjust if necessary
   console.log('Running scheduled task to send daily tracking data...');
   await sendDailyTrackingDataToAllClients();
 });
