@@ -142,13 +142,15 @@ app.post('/api/pageviews', async (req, res) => {
   }
 });
 
-
-// Send tracking data to client via email with user count and daily tracking details
-async function sendTrackingDataToClient(domain, email) {
+// Function to send tracking data to the client via email
+async function sendDailyTrackingDataToClient(domain, email) {
   const collectionName = sanitizeDomain(domain);
-  let Tracking = mongoose.models[collectionName];
 
-  if (!Tracking) {
+  // Reuse existing model or create a new one if necessary
+  let Tracking;
+  if (mongoose.models[collectionName]) {
+    Tracking = mongoose.model(collectionName);
+  } else {
     const trackingSchema = new mongoose.Schema({
       url: String,
       type: String,
@@ -171,51 +173,61 @@ async function sendTrackingDataToClient(domain, email) {
   });
 
   try {
-    const oneDayAgo = new Date();
-    oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+    // Get today's date (at midnight) and tomorrow's date for range filtering
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);  // Set time to midnight (start of the day)
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);  // Set time to midnight (start of the next day)
 
+    // Retrieve all tracking data for the domain from the last 24 hours
     const trackingData = await Tracking.find({
-      timestamp: { $gte: oneDayAgo }
+      timestamp: { $gte: today, $lt: tomorrow }
     }).lean();
 
+    // Check if there is any data to send
     if (!trackingData.length) {
-      console.log(`No tracking data available for ${domain}`);
+      console.log(`No tracking data available for ${domain} within the last 24 hours`);
       return;
     }
 
-    const uniqueUsers = new Set(trackingData.map(doc => doc.ip));
-    const userCount = uniqueUsers.size;
-
-    let dataText = `Tracking data for ${domain} (Last 24 Hours):\n\n`;
-    dataText += `Total Unique Users: ${userCount}\n\n`;
+    // Format tracking data for email
+    let dataText = `Tracking data for ${domain} from the last 24 hours:\n\n`;
     trackingData.forEach(doc => {
       dataText += `URL: ${doc.url}\n`;
-      // dataText += `Type: ${doc.type}\n`;
-      // dataText += `IP: ${doc.ip}\n`;
-      // dataText += `Session ID: ${doc.sessionId}\n`;
+      dataText += `Type: ${doc.type}\n`;
+      dataText += `IP: ${doc.ip}\n`;
+      dataText += `Session ID: ${doc.sessionId}\n`;
       dataText += `Timestamp: ${new Date(doc.timestamp).toLocaleString()}\n`;
       dataText += `Pageviews: ${doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews'}\n`;
 
-      // Handle buttons clicked
-      const buttonsObject = Object.entries(doc.buttons).reduce((acc, [key, value]) => {
-        acc[key] = value;
-        return acc;
-      }, {});
-      dataText += `Buttons Clicked: ${Object.keys(buttonsObject).length ? JSON.stringify(buttonsObject) : 'No button clicks'}\n`;
+      // Ensure button clicks are captured properly
+      if (doc.buttons && Object.keys(doc.buttons).length > 0) {
+        const buttonsObject = Array.from(doc.buttons).reduce((acc, [key, value]) => {
+          acc[key] = value;
+          return acc;
+        }, {});
+        dataText += `Buttons Clicked: ${JSON.stringify(buttonsObject)}\n`;
+      } else {
+        dataText += `Buttons Clicked: No button clicks\n`;
+      }
 
-      // Handle links clicked
-      const linksObject = Object.entries(doc.links).reduce((acc, [key, value]) => {
-        acc[key] = value;
-        return acc;
-      }, {});
-      dataText += `Links Clicked: ${Object.keys(linksObject).length ? JSON.stringify(linksObject) : 'No link clicks'}\n\n`;
+      // Ensure link clicks are captured properly
+      if (doc.links && Object.keys(doc.links).length > 0) {
+        const linksObject = Array.from(doc.links).reduce((acc, [key, value]) => {
+          acc[key] = value;
+          return acc;
+        }, {});
+        dataText += `Links Clicked: ${JSON.stringify(linksObject)}\n\n`;
+      } else {
+        dataText += `Links Clicked: No link clicks\n\n`;
+      }
     });
 
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
       subject: `Daily Tracking Data for ${domain}`,
-      text: dataText || 'No tracking data available.'
+      text: dataText || 'No tracking data available for today.'
     };
 
     await transporter.sendMail(mailOptions);
@@ -225,17 +237,17 @@ async function sendTrackingDataToClient(domain, email) {
   }
 }
 
-
-// Send daily tracking data to all registered clients
+// Function to send tracking data to all registered clients (daily)
 async function sendDailyTrackingDataToAllClients() {
   const registrations = await Registration.find();
+
   registrations.forEach(async (reg) => {
-    await sendTrackingDataToClient(reg.domain, reg.email);
+    await sendDailyTrackingDataToClient(reg.domain, reg.email);
   });
 }
 
 // Schedule the task to run every day at 9 AM
-cron.schedule('0 9 * * *', async () => {
+cron.schedule('*/3 * * * *', async () => {  // Runs daily at 9 AM
   console.log('Running scheduled task to send daily tracking data...');
   await sendDailyTrackingDataToAllClients();
 });
