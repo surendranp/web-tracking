@@ -73,7 +73,8 @@ app.post('/api/register', async (req, res) => {
 
 // Tracking endpoint
 app.post('/api/pageviews', async (req, res) => {
-  const { domain, url, type, ip, sessionId, buttonName, linkName } = req.body;
+  const { domain, url, type, sessionId, buttonName, linkName } = req.body;
+  const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress; // Get the IP address
 
   if (!domain || !url || !ip || !sessionId) {
     return res.status(400).send('Domain, URL, IP, and Session ID are required.');
@@ -121,6 +122,7 @@ app.post('/api/pageviews', async (req, res) => {
   }
 });
 
+
 // Send tracking data to client via email with CSV attachment
 async function sendTrackingDataToClient(domain, email) {
   const collectionName = sanitizeDomain(domain);
@@ -142,7 +144,6 @@ async function sendTrackingDataToClient(domain, email) {
     const oneDayAgo = new Date();
     oneDayAgo.setDate(oneDayAgo.getDate() - 1);
 
-    // Fetch tracking data for the last 24 hours
     const trackingData = await Tracking.find({
       timestamp: { $gte: oneDayAgo }
     }).lean();
@@ -241,6 +242,7 @@ async function sendTrackingDataToClient(domain, email) {
     console.error('Error sending email:', error);
   }
 }
+
 
 // Send daily tracking data to all registered clients
 async function sendDailyTrackingDataToAllClients() {
