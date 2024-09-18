@@ -200,14 +200,17 @@ async function sendDailyTrackingDataToClient(domain, email) {
 
     let dataText = `Tracking data for ${domain} from the last 24 hours:\n\n`;
     let overallDuration = 0;
+// Add overall duration and unique user count to the email
+dataText += `\nOverall Duration for All Users: ${Math.floor(overallDuration / 1000)} seconds\n`;
+dataText += `Unique Users: ${uniqueIPs.length}\n`;
 
     trackingData.forEach(doc => {
       const sessionDuration = (doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart;
       overallDuration += sessionDuration;
 
       dataText += `URL: ${doc.url}\n`;
-      dataText += `IP: ${doc.ip}\n`;
-      dataText += `Session ID: ${doc.sessionId}\n`;
+      // dataText += `IP: ${doc.ip}\n`;
+      // dataText += `Session ID: ${doc.sessionId}\n`;
       dataText += `Session Duration: ${Math.floor(sessionDuration / 1000)} seconds\n`;
       dataText += `Timestamp: ${new Date(doc.timestamp).toLocaleString()}\n`;
       dataText += `Pageviews: ${doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews'}\n`;
@@ -233,10 +236,7 @@ async function sendDailyTrackingDataToClient(domain, email) {
       }
     });
 
-    // Add overall duration and unique user count to the email
-    dataText += `\nOverall Duration for All Users: ${Math.floor(overallDuration / 1000)} seconds\n`;
-    dataText += `Unique Users: ${uniqueIPs.length}\n`;
-
+    
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
