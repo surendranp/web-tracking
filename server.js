@@ -5,6 +5,8 @@ const cors = require('cors');
 const path = require('path');
 const nodemailer = require('nodemailer');
 const cron = require('node-cron');
+const fs = require('fs');
+const { Parser } = require('json2csv');  // Import json2csv to convert JSON to CSV
 require('dotenv').config();
 
 const app = express();
@@ -41,8 +43,8 @@ const TrackingSchema = new mongoose.Schema({
   buttons: { type: Map, of: Number, default: {} },
   links: { type: Map, of: Number, default: {} },
   pageviews: [String],
-  sessionStart: { type: Date, default: Date.now },  // Add session start time
-  sessionEnd: { type: Date },  // Add session end time
+  sessionStart: { type: Date, default: Date.now },  // Session start time
+  sessionEnd: { type: Date },  // Session end time
 });
 
 const Tracking = mongoose.models.Tracking || mongoose.model('Tracking', TrackingSchema);
@@ -119,7 +121,7 @@ app.post('/api/pageviews', async (req, res) => {
   }
 });
 
-// Send tracking data to client via email with user count and daily tracking details
+// Send tracking data to client via email with CSV attachment
 async function sendTrackingDataToClient(domain, email) {
   const collectionName = sanitizeDomain(domain);
   let Tracking = mongoose.models[collectionName];
@@ -165,6 +167,26 @@ async function sendTrackingDataToClient(domain, email) {
       overallDuration += sessionDuration;
     });
 
+    // Prepare data for CSV
+    const csvFields = ['URL', 'Timestamp', 'Pageviews', 'Buttons Clicked', 'Links Clicked', 'Session Duration (seconds)'];
+    const csvData = trackingData.map(doc => ({
+      URL: doc.url,
+      Timestamp: new Date(doc.timestamp).toLocaleString(),
+      Pageviews: doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews',
+      'Buttons Clicked': Object.keys(doc.buttons).length ? JSON.stringify(Object.fromEntries(doc.buttons)) : 'No button clicks',
+      'Links Clicked': Object.keys(doc.links).length ? JSON.stringify(Object.fromEntries(doc.links)) : 'No link clicks',
+      'Session Duration (seconds)': Math.floor(((doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart) / 1000)
+    }));
+
+    // Convert JSON data to CSV
+    const json2csvParser = new Parser({ fields: csvFields });
+    const csv = json2csvParser.parse(csvData);
+
+    // Write CSV to a file (temporary file location)
+    const filePath = `./daily_tracking_${domain}.csv`;
+    fs.writeFileSync(filePath, csv);
+
+    // Email content
     let dataText = `Tracking data for ${domain} (Last 24 Hours):\n\n`;
     dataText += `Total Unique Users: ${userCount}\n`;
     dataText += `Total Pageviews: ${totalPageviews}\n`;
@@ -190,15 +212,26 @@ async function sendTrackingDataToClient(domain, email) {
       dataText += `Links Clicked: ${Object.keys(linksObject).length ? JSON.stringify(linksObject) : 'No link clicks'}\n\n`;
     });
 
+    // Email options with attachment
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
       subject: `Daily Tracking Data for ${domain}`,
-      text: dataText || 'No tracking data available.'
+      text: dataText || 'No tracking data available.',
+      attachments: [
+        {
+          filename: `daily_tracking_${domain}.csv`,
+          path: filePath
+        }
+      ]
     };
 
+    // Send email
     await transporter.sendMail(mailOptions);
-    console.log(`Daily tracking data sent to ${email}`);
+    console.log(`Daily tracking data with CSV attachment sent to ${email}`);
+
+    // Clean up the CSV file after sending the email
+    fs.unlinkSync(filePath);
   } catch (error) {
     console.error('Error sending email:', error);
   }
@@ -206,30 +239,20 @@ async function sendTrackingDataToClient(domain, email) {
 
 // Send daily tracking data to all registered clients
 async function sendDailyTrackingDataToAllClients() {
-  const registrations = await Registration.find();
-  registrations.forEach(async (reg) => {
-    await sendTrackingDataToClient(reg.domain, reg.email);
-  });
+  const registrations = await Registration.find({});
+  for (const { domain, email } of registrations) {
+    await sendTrackingDataToClient(domain, email);
+  }
 }
 
-// Schedule the task to run every day at 9 AM IST
-cron.schedule('*/3 * * * *', async () => {  // 9 AM IST is 3:30 AM UTC; adjust if necessary
-  console.log('Running scheduled task to send daily tracking data...');
+// Schedule daily email at 9 AM Indian Time
+cron.schedule('*/3 * * * *', async () => {
+  console.log('Sending daily tracking data...');
   await sendDailyTrackingDataToAllClients();
+}, {
+  timezone: 'Asia/Kolkata'
 });
 
-// Serve dashboard page
-app.get('/dashboard', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/dashboard.html'));
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
 });
-
-// Serve other pages
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/home.html'));
-});
-
-app.get('/tracking.js', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/tracking.js'));
-});
-
-app.listen(port, () => console.log(`Server running on port ${port}`));
