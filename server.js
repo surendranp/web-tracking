@@ -89,6 +89,20 @@ app.post('/api/pageviews', async (req, res) => {
       Tracking = mongoose.model(collectionName, TrackingSchema, collectionName);
     }
 
+    // Fetch geolocation data using an external service
+    const geoLocationUrl = `https://ipapi.co/${ip}/json/`;  // Using ipapi as an example
+    let geoLocationData = { country: 'Unknown', city: 'Unknown' };
+    
+    try {
+      const response = await axios.get(geoLocationUrl);
+      geoLocationData = {
+        country: response.data.country_name || 'Unknown',
+        city: response.data.city || 'Unknown'
+      };
+    } catch (geoError) {
+      console.error('Error fetching geolocation data:', geoError.message);
+    }
+
     // Check if a document with the same IP and sessionId exists
     let existingTrackingData = await Tracking.findOne({ ip, sessionId });
 
@@ -109,9 +123,6 @@ app.post('/api/pageviews', async (req, res) => {
 
       // Save the merged data
       await existingTrackingData.save();
-
-      // Optionally, you may choose to delete the newly created document if it exists
-      // await Tracking.deleteOne({ _id: newTrackingData._id });
     } else {
       // Create a new tracking document if no existing one found
       const newTrackingData = new Tracking({
@@ -121,6 +132,7 @@ app.post('/api/pageviews', async (req, res) => {
         sessionId,
         pageviews: type === 'pageview' ? [url] : [],
         sessionStart: new Date(),  // Start a new session
+        ...geoLocationData  // Add geolocation data
       });
 
       await newTrackingData.save();
@@ -272,7 +284,19 @@ cron.schedule('0 3 * * *', async () => {
 }, {
   timezone: 'Asia/Kolkata'
 });
+// Serve dashboard page
+app.get('/dashboard', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/dashboard.html'));
+});
 
+// Serve other pages
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/home.html'));
+});
+
+app.get('/tracking.js', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/tracking.js'));
+});
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
