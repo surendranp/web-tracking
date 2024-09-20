@@ -6,9 +6,9 @@ const path = require('path');
 const nodemailer = require('nodemailer');
 const cron = require('node-cron');
 const fs = require('fs');
-const { Parser } = require('json2csv');
-const axios = require('axios');
+const { Parser } = require('json2csv');  // Import json2csv to convert JSON to CSV
 require('dotenv').config();
+const axios = require('axios');  // Import axios for making HTTP requests
 
 const app = express();
 const port = process.env.PORT || 8080;
@@ -35,7 +35,6 @@ const RegistrationSchema = new mongoose.Schema({
 
 const Registration = mongoose.models.Registration || mongoose.model('Registration', RegistrationSchema);
 
-// Updated TrackingSchema with country and city
 const TrackingSchema = new mongoose.Schema({
   url: String,
   type: String,
@@ -47,8 +46,8 @@ const TrackingSchema = new mongoose.Schema({
   pageviews: [String],
   sessionStart: { type: Date, default: Date.now },  // Session start time
   sessionEnd: { type: Date },  // Session end time
-  country: String,  // Added country
-  city: String      // Added city
+  latitude: { type: Number, default: null },  // Geolocation
+  longitude: { type: Number, default: null }   // Geolocation
 });
 
 const Tracking = mongoose.models.Tracking || mongoose.model('Tracking', TrackingSchema);
@@ -77,10 +76,8 @@ app.post('/api/register', async (req, res) => {
 
 // Tracking endpoint
 app.post('/api/pageviews', async (req, res) => {
-  const { domain, url, type, sessionId, buttonName, linkName } = req.body;
-  
-  // Handle possible list of IPs and extract the first valid one
-  const ip = (req.headers['x-forwarded-for'] || req.connection.remoteAddress).split(',')[0].trim();
+  const { domain, url, type, sessionId, buttonName, linkName, latitude, longitude } = req.body;
+  const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress; // Get the IP address
 
   if (!domain || !url || !ip || !sessionId) {
     return res.status(400).send('Domain, URL, IP, and Session ID are required.');
@@ -94,55 +91,40 @@ app.post('/api/pageviews', async (req, res) => {
       Tracking = mongoose.model(collectionName, TrackingSchema, collectionName);
     }
 
-    // Fetch geolocation data using an external service
-    const geoLocationUrl = `https://ipapi.co/${ip}/json/`;  // Using ipapi as an example
-    let geoLocationData = { country: 'Unknown', city: 'Unknown' };
-    
-    try {
-      const response = await axios.get(geoLocationUrl);
-      geoLocationData = {
-        country: response.data.country_name || 'Unknown',
-        city: response.data.city || 'Unknown'
-      };
-    } catch (geoError) {
-      console.error('Error fetching geolocation data:', geoError.message);
-    }
+    // Find existing tracking data by IP and sessionId
+    let trackingData = await Tracking.findOne({ ip, sessionId });
 
-    // Check if a document with the same IP and sessionId exists
-    let existingTrackingData = await Tracking.findOne({ ip, sessionId });
-
-    if (existingTrackingData) {
-      // Merge the new data with the existing data
-      if (type === 'pageview') {
-        if (!existingTrackingData.pageviews.includes(url)) {
-          existingTrackingData.pageviews.push(url);
-        }
-      } else if (type === 'button_click') {
-        const sanitizedButtonName = buttonName ? buttonName.replace(/[.\$]/g, '_') : 'Unnamed Button';
-        existingTrackingData.buttons.set(sanitizedButtonName, (existingTrackingData.buttons.get(sanitizedButtonName) || 0) + 1);
-      } else if (type === 'link_click') {
-        const sanitizedLinkName = linkName ? linkName.replace(/[.\$]/g, '_') : 'Unnamed Link';
-        existingTrackingData.links.set(sanitizedLinkName, (existingTrackingData.links.get(sanitizedLinkName) || 0) + 1);
-      }
-      existingTrackingData.sessionEnd = new Date();  // Update session end time
-
-      // Save the merged data
-      await existingTrackingData.save();
-    } else {
-      // Create a new tracking document if no existing one found
-      const newTrackingData = new Tracking({
+    if (!trackingData) {
+      // Create a new document if none exists
+      trackingData = new Tracking({
         url,
         type,
         ip,
         sessionId,
         pageviews: type === 'pageview' ? [url] : [],
         sessionStart: new Date(),  // Start a new session
-        ...geoLocationData  // Add geolocation data
+        latitude,
+        longitude
       });
-
-      await newTrackingData.save();
+    } else {
+      // Update existing document
+      if (type === 'pageview') {
+        if (!trackingData.pageviews.includes(url)) {
+          trackingData.pageviews.push(url);
+        }
+      } else if (type === 'button_click') {
+        const sanitizedButtonName = buttonName ? buttonName.replace(/[.\$]/g, '_') : 'Unnamed Button';
+        trackingData.buttons.set(sanitizedButtonName, (trackingData.buttons.get(sanitizedButtonName) || 0) + 1);
+      } else if (type === 'link_click') {
+        const sanitizedLinkName = linkName ? linkName.replace(/[.\$]/g, '_') : 'Unnamed Link';
+        trackingData.links.set(sanitizedLinkName, (trackingData.links.get(sanitizedLinkName) || 0) + 1);
+      }
+      trackingData.sessionEnd = new Date();  // Update session end time
+      trackingData.latitude = latitude;
+      trackingData.longitude = longitude;
     }
 
+    await trackingData.save();
     res.status(200).send('Tracking data stored successfully');
   } catch (error) {
     console.error('Error saving tracking data:', error);
@@ -203,7 +185,7 @@ async function sendTrackingDataToClient(domain, email) {
     });
 
     // Prepare data for CSV
-    const csvFields = ['URL', 'Timestamp', 'Pageviews', 'Buttons Clicked', 'Links Clicked', 'Session Duration (seconds)'];
+    const csvFields = ['URL', 'Timestamp', 'Pageviews', 'Buttons Clicked', 'Links Clicked', 'Session Duration (seconds)', 'Latitude', 'Longitude'];
     const csvData = trackingData.map(doc => {
       const buttonClicks = doc.buttons instanceof Map ? doc.buttons : new Map(Object.entries(doc.buttons));
       const linkClicks = doc.links instanceof Map ? doc.links : new Map(Object.entries(doc.links));
@@ -214,7 +196,9 @@ async function sendTrackingDataToClient(domain, email) {
         Pageviews: doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews',
         'Buttons Clicked': Object.keys(Object.fromEntries(buttonClicks)).length ? JSON.stringify(Object.fromEntries(buttonClicks)) : 'No button clicks',
         'Links Clicked': Object.keys(Object.fromEntries(linkClicks)).length ? JSON.stringify(Object.fromEntries(linkClicks)) : 'No link clicks',
-        'Session Duration (seconds)': Math.floor(((doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart) / 1000)
+        'Session Duration (seconds)': Math.floor(((doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart) / 1000),
+        Latitude: doc.latitude,
+        Longitude: doc.longitude
       };
     });
 
@@ -242,52 +226,39 @@ async function sendTrackingDataToClient(domain, email) {
       dataText += `Timestamp: ${new Date(doc.timestamp).toLocaleString()}\n`;
       dataText += `Pageviews: ${doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews'}\n`;
       dataText += `Buttons Clicked: ${Object.keys(Object.fromEntries(buttonClicks)).length ? JSON.stringify(Object.fromEntries(buttonClicks)) : 'No button clicks'}\n`;
-      dataText += `Links Clicked: ${Object.keys(Object.fromEntries(linksObject)).length ? JSON.stringify(Object.fromEntries(linksObject)) : 'No link clicks'}\n\n`;
+      dataText += `Links Clicked: ${Object.keys(Object.fromEntries(linksObject)).length ? JSON.stringify(Object.fromEntries(linksObject)) : 'No link clicks'}\n`;
+      dataText += `Session Duration (seconds): ${Math.floor(((doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart) / 1000)}\n`;
+      dataText += `Latitude: ${doc.latitude}\n`;
+      dataText += `Longitude: ${doc.longitude}\n\n`;
     });
 
-    // Email options with attachment
-    const mailOptions = {
+    await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: email,
-      subject: `Daily Tracking Data for ${domain}`,
-      text: dataText || 'No tracking data available.',
-      attachments: [
-        {
-          filename: `daily_tracking_${domain}.csv`,
-          path: filePath
-        }
-      ]
-    };
+      subject: `Daily Tracking Report for ${domain}`,
+      text: dataText,
+      attachments: [{
+        filename: `daily_tracking_${domain}.csv`,
+        path: filePath
+      }]
+    });
 
-    // Send email
-    await transporter.sendMail(mailOptions);
-    console.log(`Daily tracking data with CSV attachment sent to ${email}`);
-
-    // Clean up the CSV file after sending the email
-    fs.unlinkSync(filePath);
+    fs.unlinkSync(filePath); // Clean up the temporary CSV file
   } catch (error) {
-    console.error('Error sending email:', error);
+    console.error('Error sending tracking data email:', error);
   }
 }
 
-// Send daily tracking data to all registered clients
-async function sendDailyTrackingDataToAllClients() {
+// Set up daily email sending using cron
+cron.schedule('0 3 * * *', async () => {  // 3 AM UTC is 9:30 AM IST
   try {
     const registrations = await Registration.find({});
-    for (const { domain, email } of registrations) {
-      await sendTrackingDataToClient(domain, email);
+    for (const reg of registrations) {
+      await sendTrackingDataToClient(reg.domain, reg.email);
     }
   } catch (error) {
-    console.error('Error sending daily tracking data to clients:', error);
+    console.error('Error scheduling daily tracking report:', error);
   }
-}
-
-// Schedule daily email at 9 AM Indian Time
-cron.schedule('0 3 * * *', async () => {
-  console.log('Sending daily tracking data...');
-  await sendDailyTrackingDataToAllClients();
-}, {
-  timezone: 'Asia/Kolkata'
 });
 // Serve dashboard page
 app.get('/dashboard', (req, res) => {
@@ -303,6 +274,5 @@ app.get('/tracking.js', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/tracking.js'));
 });
 
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
-});
+
+app.listen(port, () => console.log(`Server running on port ${port}`));
