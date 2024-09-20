@@ -35,6 +35,7 @@ const RegistrationSchema = new mongoose.Schema({
 
 const Registration = mongoose.models.Registration || mongoose.model('Registration', RegistrationSchema);
 
+// Updated TrackingSchema with country and city
 const TrackingSchema = new mongoose.Schema({
   url: String,
   type: String,
@@ -46,6 +47,8 @@ const TrackingSchema = new mongoose.Schema({
   pageviews: [String],
   sessionStart: { type: Date, default: Date.now },  // Session start time
   sessionEnd: { type: Date },  // Session end time
+  country: String,  // Added country
+  city: String      // Added city
 });
 
 const Tracking = mongoose.models.Tracking || mongoose.model('Tracking', TrackingSchema);
@@ -75,7 +78,9 @@ app.post('/api/register', async (req, res) => {
 // Tracking endpoint
 app.post('/api/pageviews', async (req, res) => {
   const { domain, url, type, sessionId, buttonName, linkName } = req.body;
-  const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+  
+  // Handle possible list of IPs and extract the first valid one
+  const ip = (req.headers['x-forwarded-for'] || req.connection.remoteAddress).split(',')[0].trim();
 
   if (!domain || !url || !ip || !sessionId) {
     return res.status(400).send('Domain, URL, IP, and Session ID are required.');
