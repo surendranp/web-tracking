@@ -78,11 +78,12 @@ app.post('/api/register', async (req, res) => {
 // Tracking endpoint
 app.post('/api/pageviews', async (req, res) => {
   const { domain, url, type, sessionId, buttonName, linkName } = req.body;
-  
-  // Handle possible list of IPs and extract the first valid one
-  const ip = (req.headers['x-forwarded-for'] || req.connection.remoteAddress).split(',')[0].trim();
 
-  if (!domain || !url || !ip || !sessionId) {
+  // Handle IPs behind proxies
+  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+  const cleanedIp = ip.split(',')[0].trim(); // In case multiple IPs are returned
+
+  if (!domain || !url || !cleanedIp || !sessionId) {
     return res.status(400).send('Domain, URL, IP, and Session ID are required.');
   }
 
@@ -94,22 +95,24 @@ app.post('/api/pageviews', async (req, res) => {
       Tracking = mongoose.model(collectionName, TrackingSchema, collectionName);
     }
 
-    // Fetch geolocation data using an external service
-    const geoLocationUrl = `https://ipapi.co/${ip}/json/`;  // Using ipapi as an example
+    // Fetch geolocation data using ipapi or any other IP-based service
+    const geoLocationUrl = `https://ipapi.co/${cleanedIp}/json/`;
     let geoLocationData = { country: 'Unknown', city: 'Unknown' };
-    
+
     try {
       const response = await axios.get(geoLocationUrl);
-      geoLocationData = {
-        country: response.data.country_name || 'Unknown',
-        city: response.data.city || 'Unknown'
-      };
+      if (response.data) {
+        geoLocationData = {
+          country: response.data.country_name || 'Unknown',
+          city: response.data.city || 'Unknown'
+        };
+      }
     } catch (geoError) {
       console.error('Error fetching geolocation data:', geoError.message);
     }
 
     // Check if a document with the same IP and sessionId exists
-    let existingTrackingData = await Tracking.findOne({ ip, sessionId });
+    let existingTrackingData = await Tracking.findOne({ ip: cleanedIp, sessionId });
 
     if (existingTrackingData) {
       // Merge the new data with the existing data
@@ -133,11 +136,12 @@ app.post('/api/pageviews', async (req, res) => {
       const newTrackingData = new Tracking({
         url,
         type,
-        ip,
+        ip: cleanedIp,
         sessionId,
         pageviews: type === 'pageview' ? [url] : [],
         sessionStart: new Date(),  // Start a new session
-        ...geoLocationData  // Add geolocation data
+        country: geoLocationData.country,
+        city: geoLocationData.city
       });
 
       await newTrackingData.save();
@@ -149,6 +153,7 @@ app.post('/api/pageviews', async (req, res) => {
     res.status(500).send('Internal Server Error');
   }
 });
+
 
 // Send tracking data to client via email with CSV attachment
 async function sendTrackingDataToClient(domain, email) {
