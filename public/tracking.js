@@ -1,5 +1,6 @@
 (function() {
   const trackingUrl = 'https://web-tracking-mongodburi.up.railway.app/api/pageviews'; // Replace with your actual API URL
+  const adBlockerUrl = 'https://web-tracking-mongodburi.up.railway.app/api/adblocker'; // Add this line
 
   // Function to get user IP
   async function getUserIP() {
@@ -13,28 +14,52 @@
     }
   }
 
-  // Function to get geolocation data
-  function getGeolocation() {
-    return new Promise((resolve, reject) => {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            resolve({
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude
-            });
-          },
-          (error) => {
-            console.error('Error getting geolocation:', error.message);
-            resolve({ latitude: null, longitude: null });
-          }
-        );
-      } else {
-        console.log('Geolocation is not supported by this browser.');
-        resolve({ latitude: null, longitude: null });
-      }
+  // Function to detect ad blocker
+  function detectAdBlocker() {
+    const ad = document.createElement('div');
+    ad.innerHTML = '&nbsp;';
+    ad.className = 'adsbox';
+    document.body.appendChild(ad);
+    
+    return new Promise(resolve => {
+      window.setTimeout(() => {
+        const isBlocked = ad.offsetHeight === 0;
+        ad.remove();
+        resolve(isBlocked);
+      }, 100);
     });
   }
+
+  // Function to send ad blocker status to the server
+  async function sendAdBlockerStatus(isBlocked) {
+    const ip = await getUserIP();
+    const domain = window.location.hostname;
+    const sessionId = localStorage.getItem('sessionId') || generateSessionId();
+    localStorage.setItem('sessionId', sessionId);
+
+    fetch(adBlockerUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        domain,
+        adBlocker: isBlocked,
+        sessionId
+      })
+    }).catch(error => console.error('Error sending ad blocker status:', error.message));
+  }
+
+  // Main tracking function
+  async function track() {
+    const isBlocked = await detectAdBlocker();
+    await sendAdBlockerStatus(isBlocked);
+    // Track page view
+    trackPageView();
+  }
+
+  // Initialize tracking
+  track();
 
   // Function to generate a unique session ID
   function generateSessionId() {
@@ -44,21 +69,18 @@
   // Function to send tracking data to the server
   async function sendTrackingData(data) {
     const ip = await getUserIP();
-    const domain = window.location.hostname;  // Capture the domain name
-    const geolocation = await getGeolocation();
+    const domain = window.location.hostname;
+    const sessionId = localStorage.getItem('sessionId') || generateSessionId();
+    localStorage.setItem('sessionId', sessionId);
 
     fetch(trackingUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ ...data, ip, domain, ...geolocation })  // Include geolocation data
+      body: JSON.stringify({ ...data, ip, domain, sessionId })
     }).catch(error => console.error('Error sending tracking data:', error.message));
   }
-
-  // Retrieve or generate a session ID
-  let sessionId = localStorage.getItem('sessionId') || generateSessionId();
-  localStorage.setItem('sessionId', sessionId);
 
   // Track page view
   function trackPageView() {
@@ -66,11 +88,8 @@
       type: 'pageview',
       url: window.location.href,
       timestamp: new Date().toISOString(),
-      sessionId
     });
   }
-
-  trackPageView(); // Initial page view tracking
 
   // Track click events
   document.addEventListener('click', function(event) {
@@ -83,7 +102,6 @@
         buttonName: elementName,
         url: window.location.href,
         timestamp: new Date().toISOString(),
-        sessionId
       });
     } else if (event.target.tagName === 'A') {
       elementName = event.target.innerText || event.target.id || 'Unnamed Link';
@@ -92,12 +110,11 @@
         linkName: elementName,
         url: window.location.href,
         timestamp: new Date().toISOString(),
-        sessionId
       });
     }
   });
 
-  // Track page navigation (i.e., navigation path)
+  // Track page navigation
   window.addEventListener('popstate', trackPageView);
   window.addEventListener('hashchange', trackPageView); // For hash-based routing
 })();
