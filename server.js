@@ -33,8 +33,9 @@ const RegistrationSchema = new mongoose.Schema({
   email: { type: String, required: true }
 });
 
-const Registration = mongoose.model('Registration', RegistrationSchema);
+const Registration = mongoose.models.Registration || mongoose.model('Registration', RegistrationSchema);
 
+// Updated TrackingSchema with country and city
 const TrackingSchema = new mongoose.Schema({
   url: String,
   type: String,
@@ -44,14 +45,14 @@ const TrackingSchema = new mongoose.Schema({
   buttons: { type: Map, of: Number, default: {} },
   links: { type: Map, of: Number, default: {} },
   pageviews: [String],
-  sessionStart: { type: Date, default: Date.now },
-  sessionEnd: { type: Date },
-  country: String,
-  city: String,
-  adBlockerCount: { type: Number, default: 0 }
+  sessionStart: { type: Date, default: Date.now },  // Session start time
+  sessionEnd: { type: Date },  // Session end time
+  country: String,  // Added country
+  city: String,// Added city
+  adBlockerCount: { type: Number, default: 0 }      
 });
 
-const Tracking = mongoose.model('Tracking', TrackingSchema);
+const Tracking = mongoose.models.Tracking || mongoose.model('Tracking', TrackingSchema);
 
 // Register endpoint
 app.post('/api/register', async (req, res) => {
@@ -59,6 +60,12 @@ app.post('/api/register', async (req, res) => {
   try {
     const registration = new Registration({ domain, email });
     await registration.save();
+    const collectionName = sanitizeDomain(domain);
+
+    if (!mongoose.models[collectionName]) {
+      mongoose.model(collectionName, TrackingSchema, collectionName);
+    }
+
     res.status(200).send('Registration successful.');
   } catch (error) {
     if (error.code === 11000) {
@@ -68,7 +75,6 @@ app.post('/api/register', async (req, res) => {
     res.status(500).send('Internal Server Error');
   }
 });
-
 // Ad blocker tracking endpoint
 app.post('/api/adblocker', async (req, res) => {
   const { domain, adBlocker, sessionId } = req.body;
@@ -79,14 +85,30 @@ app.post('/api/adblocker', async (req, res) => {
 
   try {
     const collectionName = sanitizeDomain(domain);
-    let Tracking = mongoose.model(collectionName, TrackingSchema);
+    let Tracking = mongoose.models[collectionName];
 
-    // Update existing document or create a new one
-    await Tracking.findOneAndUpdate(
-      { sessionId },
-      { $inc: { adBlockerCount: adBlocker ? 1 : 0 } },
-      { upsert: true, new: true }
-    );
+    if (!Tracking) {
+      Tracking = mongoose.model(collectionName, TrackingSchema, collectionName);
+    }
+
+    // Update or create the tracking document
+    let existingTrackingData = await Tracking.findOne({ sessionId });
+
+    if (existingTrackingData) {
+      existingTrackingData.adBlockerCount = existingTrackingData.adBlockerCount || 0;
+      if (adBlocker) {
+        existingTrackingData.adBlockerCount += 1; // Increment if ad blocker is detected
+      }
+      await existingTrackingData.save();
+    } else {
+      // Create a new document if no existing one found
+      const newTrackingData = new Tracking({
+        sessionId,
+        adBlockerCount: adBlocker ? 1 : 0
+      });
+
+      await newTrackingData.save();
+    }
 
     res.status(200).send('Ad blocker status recorded successfully');
   } catch (error) {
@@ -98,51 +120,74 @@ app.post('/api/adblocker', async (req, res) => {
 // Tracking endpoint
 app.post('/api/pageviews', async (req, res) => {
   const { domain, url, type, sessionId, buttonName, linkName } = req.body;
-  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress.split(',')[0].trim();
 
-  if (!domain || !url || !ip || !sessionId) {
+  // Handle IPs behind proxies
+  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+  const cleanedIp = ip.split(',')[0].trim(); // In case multiple IPs are returned
+
+  if (!domain || !url || !cleanedIp || !sessionId) {
     return res.status(400).send('Domain, URL, IP, and Session ID are required.');
   }
 
   try {
     const collectionName = sanitizeDomain(domain);
-    let Tracking = mongoose.model(collectionName, TrackingSchema);
-    
-    // Fetch geolocation data
-    const geoLocationUrl = `https://ipapi.co/${ip}/json/`;
+    let Tracking = mongoose.models[collectionName];
+
+    if (!Tracking) {
+      Tracking = mongoose.model(collectionName, TrackingSchema, collectionName);
+    }
+
+    // Fetch geolocation data using ipapi or any other IP-based service
+    const geoLocationUrl = `https://ipapi.co/${cleanedIp}/json/`;
     let geoLocationData = { country: 'Unknown', city: 'Unknown' };
 
     try {
       const response = await axios.get(geoLocationUrl);
-      geoLocationData = {
-        country: response.data.country_name || 'Unknown',
-        city: response.data.city || 'Unknown'
-      };
+      if (response.data) {
+        geoLocationData = {
+          country: response.data.country_name || 'Unknown',
+          city: response.data.city || 'Unknown'
+        };
+      }
     } catch (geoError) {
       console.error('Error fetching geolocation data:', geoError.message);
     }
 
-    const updateFields = {
-      sessionEnd: new Date(),
-      $setOnInsert: { sessionStart: new Date(), country: geoLocationData.country, city: geoLocationData.city }
-    };
+    // Check if a document with the same IP and sessionId exists
+    let existingTrackingData = await Tracking.findOne({ ip: cleanedIp, sessionId });
 
-    if (type === 'pageview') {
-      updateFields.$addToSet = { pageviews: url };  // Add pageview only if not already present
-    } else if (type === 'button_click') {
-      const sanitizedButtonName = buttonName ? buttonName.replace(/[.\$]/g, '_') : 'Unnamed Button';
-      updateFields.$inc = { [`buttons.${sanitizedButtonName}`]: 1 };  // Increment button click count
-    } else if (type === 'link_click') {
-      const sanitizedLinkName = linkName ? linkName.replace(/[.\$]/g, '_') : 'Unnamed Link';
-      updateFields.$inc = { [`links.${sanitizedLinkName}`]: 1 };  // Increment link click count
+    if (existingTrackingData) {
+      // Merge the new data with the existing data
+      if (type === 'pageview') {
+        if (!existingTrackingData.pageviews.includes(url)) {
+          existingTrackingData.pageviews.push(url);
+        }
+      } else if (type === 'button_click') {
+        const sanitizedButtonName = buttonName ? buttonName.replace(/[.\$]/g, '_') : 'Unnamed Button';
+        existingTrackingData.buttons.set(sanitizedButtonName, (existingTrackingData.buttons.get(sanitizedButtonName) || 0) + 1);
+      } else if (type === 'link_click') {
+        const sanitizedLinkName = linkName ? linkName.replace(/[.\$]/g, '_') : 'Unnamed Link';
+        existingTrackingData.links.set(sanitizedLinkName, (existingTrackingData.links.get(sanitizedLinkName) || 0) + 1);
+      }
+      existingTrackingData.sessionEnd = new Date();  // Update session end time
+
+      // Save the merged data
+      await existingTrackingData.save();
+    } else {
+      // Create a new tracking document if no existing one found
+      const newTrackingData = new Tracking({
+        url,
+        type,
+        ip: cleanedIp,
+        sessionId,
+        pageviews: type === 'pageview' ? [url] : [],
+        sessionStart: new Date(),  // Start a new session
+        country: geoLocationData.country,
+        city: geoLocationData.city
+      });
+
+      await newTrackingData.save();
     }
-
-    // Update or create document
-    await Tracking.findOneAndUpdate(
-      { ip, sessionId },
-      updateFields,
-      { upsert: true, new: true }
-    );
 
     res.status(200).send('Tracking data stored successfully');
   } catch (error) {
@@ -151,10 +196,15 @@ app.post('/api/pageviews', async (req, res) => {
   }
 });
 
+
 // Send tracking data to client via email with CSV attachment
 async function sendTrackingDataToClient(domain, email) {
   const collectionName = sanitizeDomain(domain);
-  let Tracking = mongoose.model(collectionName, TrackingSchema);
+  let Tracking = mongoose.models[collectionName];
+
+  if (!Tracking) {
+    Tracking = mongoose.model(collectionName, TrackingSchema, collectionName);
+  }
 
   const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -177,8 +227,11 @@ async function sendTrackingDataToClient(domain, email) {
       return;
     }
 
+    // Calculate unique users based on IP addresses
     const uniqueUsers = new Set(trackingData.map(doc => doc.ip));
     const userCount = uniqueUsers.size;
+
+    // Calculate total ad blocker users
     const adBlockerUsers = trackingData.filter(doc => doc.adBlockerCount > 0).length;
 
     let totalPageviews = 0;
@@ -188,43 +241,85 @@ async function sendTrackingDataToClient(domain, email) {
 
     trackingData.forEach(doc => {
       totalPageviews += doc.pageviews.length;
-      totalButtonClicks += [...doc.buttons.values()].reduce((sum, count) => sum + count, 0);
-      totalLinkClicks += [...doc.links.values()].reduce((sum, count) => sum + count, 0);
-      overallDuration += (doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart;
+
+      const buttonClicks = doc.buttons instanceof Map ? doc.buttons : new Map(Object.entries(doc.buttons));
+      totalButtonClicks += [...buttonClicks.values()].reduce((sum, count) => sum + count, 0);
+
+      const linkClicks = doc.links instanceof Map ? doc.links : new Map(Object.entries(doc.links));
+      totalLinkClicks += [...linkClicks.values()].reduce((sum, count) => sum + count, 0);
+
+      const sessionDuration = (doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart;
+      overallDuration += sessionDuration;
     });
 
+    // Prepare data for CSV
     const csvFields = ['URL', 'Timestamp', 'Pageviews', 'Buttons Clicked', 'Links Clicked', 'Session Duration (seconds)'];
-    const csvData = trackingData.map(doc => ({
-      URL: doc.url,
-      Timestamp: new Date(doc.timestamp).toLocaleString(),
-      Pageviews: doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews',
-      'Buttons Clicked': JSON.stringify([...doc.buttons.entries()]),
-      'Links Clicked': JSON.stringify([...doc.links.entries()]),
-      'Session Duration (seconds)': Math.floor(((doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart) / 1000)
-    }));
+    const csvData = trackingData.map(doc => {
+      const buttonClicks = doc.buttons instanceof Map ? doc.buttons : new Map(Object.entries(doc.buttons));
+      const linkClicks = doc.links instanceof Map ? doc.links : new Map(Object.entries(doc.links));
 
+      return {
+        URL: doc.url,
+        Timestamp: new Date(doc.timestamp).toLocaleString(),
+        Pageviews: doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews',
+        'Buttons Clicked': Object.keys(Object.fromEntries(buttonClicks)).length ? JSON.stringify(Object.fromEntries(buttonClicks)) : 'No button clicks',
+        'Links Clicked': Object.keys(Object.fromEntries(linkClicks)).length ? JSON.stringify(Object.fromEntries(linkClicks)) : 'No link clicks',
+        'Session Duration (seconds)': Math.floor(((doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart) / 1000)
+      };
+    });
+
+    // Convert JSON data to CSV
     const json2csvParser = new Parser({ fields: csvFields });
     const csv = json2csvParser.parse(csvData);
 
+    // Write CSV to a file (temporary file location)
     const filePath = `./daily_tracking_${domain}.csv`;
     fs.writeFileSync(filePath, csv);
 
+    // Email content
+    let dataText = `Tracking data for ${domain} (Last 24 Hours):\n\n`;
+    dataText += `Total Unique Users: ${userCount}\n`;
+    dataText += `Total Ad Blocker Users: ${adBlockerUsers}\n`; // Add this line
+    dataText += `Total Pageviews: ${totalPageviews}\n`;
+    dataText += `Total Button Clicks: ${totalButtonClicks}\n`;
+    dataText += `Total Link Clicks: ${totalLinkClicks}\n`;
+    dataText += `Overall Duration for All Users: ${Math.floor(overallDuration / 1000)} seconds\n\n`;
+
+    trackingData.forEach(doc => {
+      const buttonClicks = doc.buttons instanceof Map ? doc.buttons : new Map(Object.entries(doc.buttons));
+      const linksObject = doc.links instanceof Map ? doc.links : new Map(Object.entries(doc.links));
+
+      dataText += `URL: ${doc.url}\n`;
+      dataText += `Timestamp: ${new Date(doc.timestamp).toLocaleString()}\n`;
+      dataText += `Pageviews: ${doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews'}\n`;
+      dataText += `Buttons Clicked: ${Object.keys(Object.fromEntries(buttonClicks)).length ? JSON.stringify(Object.fromEntries(buttonClicks)) : 'No button clicks'}\n`;
+      dataText += `Links Clicked: ${Object.keys(Object.fromEntries(linksObject)).length ? JSON.stringify(Object.fromEntries(linksObject)) : 'No link clicks'}\n\n`;
+    });
+
+    // Email options with attachment
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
       subject: `Daily Tracking Data for ${domain}`,
-      text: `Tracking data for ${domain} (Last 24 Hours):\n\nTotal Unique Users: ${userCount}\nTotal Ad Blocker Users: ${adBlockerUsers}\nTotal Pageviews: ${totalPageviews}\nTotal Button Clicks: ${totalButtonClicks}\nTotal Link Clicks: ${totalLinkClicks}\nOverall Duration for All Users: ${Math.floor(overallDuration / 1000)} seconds\n`,
-      attachments: [{ filename: `daily_tracking_${domain}.csv`, path: filePath }]
+      text: dataText || 'No tracking data available.',
+      attachments: [
+        {
+          filename: `daily_tracking_${domain}.csv`,
+          path: filePath
+        }
+      ]
     };
 
+    // Send email
     await transporter.sendMail(mailOptions);
     console.log(`Daily tracking data with CSV attachment sent to ${email}`);
+
+    // Clean up the CSV file after sending the email
     fs.unlinkSync(filePath);
   } catch (error) {
     console.error('Error sending email:', error);
   }
 }
-
 // Send daily tracking data to all registered clients
 async function sendDailyTrackingDataToAllClients() {
   try {
@@ -244,7 +339,6 @@ cron.schedule('0 3 * * *', async () => {
 }, {
   timezone: 'Asia/Kolkata'
 });
-
 // Serve dashboard page
 app.get('/dashboard', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/dashboard.html'));
