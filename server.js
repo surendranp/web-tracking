@@ -48,8 +48,7 @@ const TrackingSchema = new mongoose.Schema({
   sessionStart: { type: Date, default: Date.now },  // Session start time
   sessionEnd: { type: Date },  // Session end time
   country: String,  // Added country
-  city: String,// Added city
-  adBlockerCount: { type: Number, default: 0 }      
+  city: String,      // Added city
 });
 
 const Tracking = mongoose.models.Tracking || mongoose.model('Tracking', TrackingSchema);
@@ -72,47 +71,6 @@ app.post('/api/register', async (req, res) => {
       return res.status(400).send('Domain already registered.');
     }
     console.error('Error registering domain:', error);
-    res.status(500).send('Internal Server Error');
-  }
-});
-// Ad blocker tracking endpoint
-app.post('/api/adblocker', async (req, res) => {
-  const { domain, adBlocker, sessionId } = req.body;
-
-  if (!domain || !sessionId) {
-    return res.status(400).send('Domain and Session ID are required.');
-  }
-
-  try {
-    const collectionName = sanitizeDomain(domain);
-    let Tracking = mongoose.models[collectionName];
-
-    if (!Tracking) {
-      Tracking = mongoose.model(collectionName, TrackingSchema, collectionName);
-    }
-
-    // Update or create the tracking document
-    let existingTrackingData = await Tracking.findOne({ sessionId });
-
-    if (existingTrackingData) {
-      existingTrackingData.adBlockerCount = existingTrackingData.adBlockerCount || 0;
-      if (adBlocker) {
-        existingTrackingData.adBlockerCount += 1; // Increment if ad blocker is detected
-      }
-      await existingTrackingData.save();
-    } else {
-      // Create a new document if no existing one found
-      const newTrackingData = new Tracking({
-        sessionId,
-        adBlockerCount: adBlocker ? 1 : 0
-      });
-
-      await newTrackingData.save();
-    }
-
-    res.status(200).send('Ad blocker status recorded successfully');
-  } catch (error) {
-    console.error('Error saving ad blocker status:', error);
     res.status(500).send('Internal Server Error');
   }
 });
@@ -231,9 +189,6 @@ async function sendTrackingDataToClient(domain, email) {
     const uniqueUsers = new Set(trackingData.map(doc => doc.ip));
     const userCount = uniqueUsers.size;
 
-    // Calculate total ad blocker users
-    const adBlockerUsers = trackingData.filter(doc => doc.adBlockerCount > 0).length;
-
     let totalPageviews = 0;
     let totalButtonClicks = 0;
     let totalLinkClicks = 0;
@@ -279,7 +234,6 @@ async function sendTrackingDataToClient(domain, email) {
     // Email content
     let dataText = `Tracking data for ${domain} (Last 24 Hours):\n\n`;
     dataText += `Total Unique Users: ${userCount}\n`;
-    dataText += `Total Ad Blocker Users: ${adBlockerUsers}\n`; // Add this line
     dataText += `Total Pageviews: ${totalPageviews}\n`;
     dataText += `Total Button Clicks: ${totalButtonClicks}\n`;
     dataText += `Total Link Clicks: ${totalLinkClicks}\n`;
@@ -320,6 +274,7 @@ async function sendTrackingDataToClient(domain, email) {
     console.error('Error sending email:', error);
   }
 }
+
 // Send daily tracking data to all registered clients
 async function sendDailyTrackingDataToAllClients() {
   try {
