@@ -49,6 +49,7 @@ const TrackingSchema = new mongoose.Schema({
   sessionEnd: { type: Date },  // Session end time
   country: String,  // Added country
   city: String,      // Added city
+  adBlockerActive: { type: Boolean, default: false }  // New field for ad blocker status
 });
 
 const Tracking = mongoose.models.Tracking || mongoose.model('Tracking', TrackingSchema);
@@ -77,7 +78,7 @@ app.post('/api/register', async (req, res) => {
 
 // Tracking endpoint
 app.post('/api/pageviews', async (req, res) => {
-  const { domain, url, type, sessionId, buttonName, linkName } = req.body;
+  const { domain, url, type, sessionId, buttonName, linkName,adBlockerActive  } = req.body;
 
   // Handle IPs behind proxies
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
@@ -128,7 +129,7 @@ app.post('/api/pageviews', async (req, res) => {
         existingTrackingData.links.set(sanitizedLinkName, (existingTrackingData.links.get(sanitizedLinkName) || 0) + 1);
       }
       existingTrackingData.sessionEnd = new Date();  // Update session end time
-
+      existingTrackingData.adBlockerActive = adBlockerActive;  // Update ad blocker status
       // Save the merged data
       await existingTrackingData.save();
     } else {
@@ -141,7 +142,8 @@ app.post('/api/pageviews', async (req, res) => {
         pageviews: type === 'pageview' ? [url] : [],
         sessionStart: new Date(),  // Start a new session
         country: geoLocationData.country,
-        city: geoLocationData.city
+        city: geoLocationData.city,
+        adBlockerActive  // Save ad blocker status
       });
 
       await newTrackingData.save();
@@ -188,6 +190,7 @@ async function sendTrackingDataToClient(domain, email) {
     // Calculate unique users based on IP addresses
     const uniqueUsers = new Set(trackingData.map(doc => doc.ip));
     const userCount = uniqueUsers.size;
+    const adBlockerUsers = trackingData.filter(doc => doc.adBlockerActive).length;
 
     let totalPageviews = 0;
     let totalButtonClicks = 0;
@@ -234,6 +237,7 @@ async function sendTrackingDataToClient(domain, email) {
     // Email content
     let dataText = `Tracking data for ${domain} (Last 24 Hours):\n\n`;
     dataText += `Total Unique Users: ${userCount}\n`;
+    dataText += `Total Ad Blocker Users: ${adBlockerUsers}\n`;  // Added ad blocker users count
     dataText += `Total Pageviews: ${totalPageviews}\n`;
     dataText += `Total Button Clicks: ${totalButtonClicks}\n`;
     dataText += `Total Link Clicks: ${totalLinkClicks}\n`;

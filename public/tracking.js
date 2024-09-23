@@ -40,19 +40,33 @@
   function generateSessionId() {
     return Math.random().toString(36).substr(2, 9);
   }
-
+ // Function to check for ad blockers
+ function isAdBlockerActive() {
+  return new Promise((resolve) => {
+    const adTest = document.createElement('div');
+    adTest.innerHTML = '&nbsp;';
+    adTest.className = 'adsbox';
+    document.body.appendChild(adTest);
+    window.setTimeout(() => {
+      const isBlocked = (adTest.offsetHeight === 0);
+      adTest.remove();
+      resolve(isBlocked);
+    }, 100);
+  });
+}
   // Function to send tracking data to the server
   async function sendTrackingData(data) {
     const ip = await getUserIP();
     const domain = window.location.hostname;  // Capture the domain name
     const geolocation = await getGeolocation();
+    const adBlockerActive = await isAdBlockerActive(); // Check for ad blocker
 
     fetch(trackingUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ ...data, ip, domain, ...geolocation })  // Include geolocation data
+      body: JSON.stringify({ ...data, ip, domain, ...geolocation, adBlockerActive })  // Include geolocation data
     }).catch(error => console.error('Error sending tracking data:', error.message));
   }
 
