@@ -1,5 +1,6 @@
 (function() {
-  const trackingUrl = 'https://web-tracking-mongodburi.up.railway.app/api/pageviews'; // Replace with your actual API URL
+  const trackingUrl = 'http://edatic.in/edatic-site-tracker/api/pageviews'; // Replace with your actual API URL
+  
 
   // Function to get user IP
   async function getUserIP() {
