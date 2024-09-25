@@ -210,6 +210,12 @@ async function sendTrackingDataToClient(domain, email) {
       overallDuration += sessionDuration;
     });
 
+    // Convert overallDuration from milliseconds to seconds
+    const totalDurationInSeconds = Math.floor(overallDuration / 1000);
+    const hours = Math.floor(totalDurationInSeconds / 3600);
+    const minutes = Math.floor((totalDurationInSeconds % 3600) / 60);
+    const seconds = totalDurationInSeconds % 60;
+
     // Prepare data for CSV
     const csvFields = ['URL', 'Timestamp', 'Pageviews', 'Buttons Clicked', 'Links Clicked', 'Session Duration (seconds)'];
     const csvData = trackingData.map(doc => {
@@ -241,7 +247,7 @@ async function sendTrackingDataToClient(domain, email) {
     dataText += `Total Pageviews: ${totalPageviews}\n`;
     dataText += `Total Button Clicks: ${totalButtonClicks}\n`;
     dataText += `Total Link Clicks: ${totalLinkClicks}\n`;
-    dataText += `Overall Duration for All Users: ${Math.floor(overallDuration / 1000)} seconds\n\n`;
+    dataText += `Overall Duration for All Users: ${hours} hours, ${minutes} minutes, and ${seconds} seconds\n\n`;
 
     trackingData.forEach(doc => {
       const buttonClicks = doc.buttons instanceof Map ? doc.buttons : new Map(Object.entries(doc.buttons));
@@ -278,6 +284,7 @@ async function sendTrackingDataToClient(domain, email) {
     console.error('Error sending email:', error);
   }
 }
+
 
 // Send daily tracking data to all registered clients
 async function sendDailyTrackingDataToAllClients() {
