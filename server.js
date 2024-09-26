@@ -206,15 +206,20 @@ async function sendTrackingDataToClient(domain, email) {
       const linkClicks = doc.links instanceof Map ? doc.links : new Map(Object.entries(doc.links));
       totalLinkClicks += [...linkClicks.values()].reduce((sum, count) => sum + count, 0);
 
-      const sessionDuration = (doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart;
-      overallDuration += sessionDuration;
+      // const sessionDuration = (doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart;
+      // overallDuration += sessionDuration;
+        // Ensure sessionEnd is set to current time if the session is still ongoing
+  const sessionEndTime = doc.sessionEnd ? doc.sessionEnd : new Date();
+  const sessionDuration = sessionEndTime - doc.sessionStart;
+  
+  overallDuration += sessionDuration;
     });
 
-    // Convert overallDuration from milliseconds to seconds
-    const totalDurationInSeconds = Math.floor(overallDuration / 1000);
-    const hours = Math.floor(totalDurationInSeconds / 3600);
-    const minutes = Math.floor((totalDurationInSeconds % 3600) / 60);
-    const seconds = totalDurationInSeconds % 60;
+// Convert overallDuration from milliseconds to seconds
+const totalDurationInSeconds = Math.floor(overallDuration / 1000);
+const hours = Math.floor(totalDurationInSeconds / 3600);
+const minutes = Math.floor((totalDurationInSeconds % 3600) / 60);
+const seconds = totalDurationInSeconds % 60;
 
     // Prepare data for CSV
     const csvFields = ['URL', 'Timestamp', 'Pageviews', 'Buttons Clicked', 'Links Clicked', 'Session Duration (seconds)'];
@@ -247,7 +252,9 @@ async function sendTrackingDataToClient(domain, email) {
     dataText += `Total Pageviews: ${totalPageviews}\n`;
     dataText += `Total Button Clicks: ${totalButtonClicks}\n`;
     dataText += `Total Link Clicks: ${totalLinkClicks}\n`;
+    // dataText += `Overall Duration for All Users: ${hours} hours, ${minutes} minutes, and ${seconds} seconds\n\n`;
     dataText += `Overall Duration for All Users: ${hours} hours, ${minutes} minutes, and ${seconds} seconds\n\n`;
+
 
     trackingData.forEach(doc => {
       const buttonClicks = doc.buttons instanceof Map ? doc.buttons : new Map(Object.entries(doc.buttons));
