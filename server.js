@@ -195,7 +195,7 @@ async function sendTrackingDataToClient(domain, email) {
     let totalPageviews = 0;
     let totalButtonClicks = 0;
     let totalLinkClicks = 0;
-    let overallDuration = 0;
+    let overallDuration = 0;  // To store the total duration of all users
 
     trackingData.forEach(doc => {
       totalPageviews += doc.pageviews.length;
@@ -206,20 +206,16 @@ async function sendTrackingDataToClient(domain, email) {
       const linkClicks = doc.links instanceof Map ? doc.links : new Map(Object.entries(doc.links));
       totalLinkClicks += [...linkClicks.values()].reduce((sum, count) => sum + count, 0);
 
-      // const sessionDuration = (doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart;
-      // overallDuration += sessionDuration;
-        // Ensure sessionEnd is set to current time if the session is still ongoing
-  const sessionEndTime = doc.sessionEnd ? doc.sessionEnd : new Date();
-  const sessionDuration = sessionEndTime - doc.sessionStart;
-  
-  overallDuration += sessionDuration;
+      // Calculate the session duration (if sessionEnd is null, use current time)
+      const sessionDuration = ((doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart);
+      overallDuration += sessionDuration; // Add to total duration
     });
 
-// Convert overallDuration from milliseconds to seconds
-const totalDurationInSeconds = Math.floor(overallDuration / 1000);
-const hours = Math.floor(totalDurationInSeconds / 3600);
-const minutes = Math.floor((totalDurationInSeconds % 3600) / 60);
-const seconds = totalDurationInSeconds % 60;
+    // Convert overallDuration from milliseconds to hours, minutes, and seconds
+    const totalDurationInSeconds = Math.floor(overallDuration / 1000);
+    const hours = Math.floor(totalDurationInSeconds / 3600);
+    const minutes = Math.floor((totalDurationInSeconds % 3600) / 60);
+    const seconds = totalDurationInSeconds % 60;
 
     // Prepare data for CSV
     const csvFields = ['URL', 'Timestamp', 'Pageviews', 'Buttons Clicked', 'Links Clicked', 'Session Duration (seconds)'];
@@ -237,6 +233,16 @@ const seconds = totalDurationInSeconds % 60;
       };
     });
 
+    // Add the overall total duration (for all users) to the CSV
+    csvData.push({
+      URL: 'Total Duration for All Users',
+      Timestamp: '',
+      Pageviews: '',
+      'Buttons Clicked': '',
+      'Links Clicked': '',
+      'Session Duration (seconds)': `${hours} hours, ${minutes} minutes, ${seconds} seconds`
+    });
+
     // Convert JSON data to CSV
     const json2csvParser = new Parser({ fields: csvFields });
     const csv = json2csvParser.parse(csvData);
@@ -252,9 +258,7 @@ const seconds = totalDurationInSeconds % 60;
     dataText += `Total Pageviews: ${totalPageviews}\n`;
     dataText += `Total Button Clicks: ${totalButtonClicks}\n`;
     dataText += `Total Link Clicks: ${totalLinkClicks}\n`;
-    // dataText += `Overall Duration for All Users: ${hours} hours, ${minutes} minutes, and ${seconds} seconds\n\n`;
     dataText += `Overall Duration for All Users: ${hours} hours, ${minutes} minutes, and ${seconds} seconds\n\n`;
-
 
     trackingData.forEach(doc => {
       const buttonClicks = doc.buttons instanceof Map ? doc.buttons : new Map(Object.entries(doc.buttons));
