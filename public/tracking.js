@@ -1,7 +1,9 @@
 (function() {
   const trackingUrl = 'https://web-tracking-mongodburi-08d5.up.railway.app/api/pageviews'; // Replace with your actual API URL
+  let sessionTimeout = null;
+  let sessionDuration = 0;
+  let sessionStartTime = new Date();
   
-
   // Function to get user IP
   async function getUserIP() {
     try {
@@ -41,20 +43,22 @@
   function generateSessionId() {
     return Math.random().toString(36).substr(2, 9);
   }
- // Function to check for ad blockers
- function isAdBlockerActive() {
-  return new Promise((resolve) => {
-    const adTest = document.createElement('div');
-    adTest.innerHTML = '&nbsp;';
-    adTest.className = 'adsbox';
-    document.body.appendChild(adTest);
-    window.setTimeout(() => {
-      const isBlocked = (adTest.offsetHeight === 0);
-      adTest.remove();
-      resolve(isBlocked);
-    }, 100);
-  });
-}
+
+  // Function to check for ad blockers
+  function isAdBlockerActive() {
+    return new Promise((resolve) => {
+      const adTest = document.createElement('div');
+      adTest.innerHTML = '&nbsp;';
+      adTest.className = 'adsbox';
+      document.body.appendChild(adTest);
+      window.setTimeout(() => {
+        const isBlocked = (adTest.offsetHeight === 0);
+        adTest.remove();
+        resolve(isBlocked);
+      }, 100);
+    });
+  }
+
   // Function to send tracking data to the server
   async function sendTrackingData(data) {
     const ip = await getUserIP();
@@ -83,6 +87,7 @@
       timestamp: new Date().toISOString(),
       sessionId
     });
+    sessionStartTime = new Date(); // Start session
   }
 
   trackPageView(); // Initial page view tracking
@@ -115,4 +120,44 @@
   // Track page navigation (i.e., navigation path)
   window.addEventListener('popstate', trackPageView);
   window.addEventListener('hashchange', trackPageView); // For hash-based routing
+
+  // End session on tab close or inactivity
+  function endSession() {
+    const sessionEndTime = new Date();
+    const sessionDurationInSeconds = (sessionEndTime - sessionStartTime) / 1000;
+
+    sendTrackingData({
+      type: 'session_end',
+      sessionId,
+      url: window.location.href,
+      sessionDuration: sessionDurationInSeconds,
+      timestamp: sessionEndTime.toISOString()
+    });
+  }
+
+  // Detect inactivity (mouse/keyboard)
+  function resetInactivityTimer() {
+    if (sessionTimeout) clearTimeout(sessionTimeout);
+    sessionTimeout = setTimeout(endSession, 120000);  // End session after 120 seconds of inactivity
+  }
+
+  // Listen for user activity
+  document.addEventListener('mousemove', resetInactivityTimer);
+  document.addEventListener('keydown', resetInactivityTimer);
+
+  // Track visibility change (switching tabs)
+  document.addEventListener('visibilitychange', function() {
+    if (document.hidden) {
+      endSession();
+    }
+  });
+
+  // Start inactivity timer on page load
+  resetInactivityTimer();
+
+  // End session when user closes tab or window
+  window.addEventListener('beforeunload', function() {
+    endSession();
+  });
+
 })();
