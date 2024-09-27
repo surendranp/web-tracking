@@ -218,20 +218,44 @@ async function sendTrackingDataToClient(domain, email) {
     const seconds = totalDurationInSeconds % 60;
 
     // Prepare data for CSV
-    const csvFields = ['URL', 'Timestamp', 'Pageviews', 'Buttons Clicked', 'Links Clicked', 'Session Duration (seconds)'];
+    const csvFields = ['URL', 'Timestamp', 'Pageviews', 'Buttons Clicked', 'Links Clicked', 'Session Duration (seconds)','Session Duration (H:M:S)','Country','City'];
+    // const csvData = trackingData.map(doc => {
+    //   const buttonClicks = doc.buttons instanceof Map ? doc.buttons : new Map(Object.entries(doc.buttons));
+    //   const linkClicks = doc.links instanceof Map ? doc.links : new Map(Object.entries(doc.links));
+
+    //   return {
+    //     URL: doc.url,
+    //     Timestamp: new Date(doc.timestamp).toLocaleString(),
+    //     Pageviews: doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews',
+    //     'Buttons Clicked': Object.keys(Object.fromEntries(buttonClicks)).length ? JSON.stringify(Object.fromEntries(buttonClicks)) : 'No button clicks',
+    //     'Links Clicked': Object.keys(Object.fromEntries(linkClicks)).length ? JSON.stringify(Object.fromEntries(linkClicks)) : 'No link clicks',
+    //     'Session Duration (seconds)': Math.floor(((doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart) / 1000)
+    //   };
+    // });
     const csvData = trackingData.map(doc => {
       const buttonClicks = doc.buttons instanceof Map ? doc.buttons : new Map(Object.entries(doc.buttons));
       const linkClicks = doc.links instanceof Map ? doc.links : new Map(Object.entries(doc.links));
-
+      
+      // Calculate the session duration
+      const sessionDurationMs = (doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart;
+      const sessionDurationInSeconds = Math.floor(sessionDurationMs / 1000);
+      const hours = Math.floor(sessionDurationInSeconds / 3600);
+      const minutes = Math.floor((sessionDurationInSeconds % 3600) / 60);
+      const seconds = sessionDurationInSeconds % 60;
+    
       return {
         URL: doc.url,
         Timestamp: new Date(doc.timestamp).toLocaleString(),
         Pageviews: doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews',
         'Buttons Clicked': Object.keys(Object.fromEntries(buttonClicks)).length ? JSON.stringify(Object.fromEntries(buttonClicks)) : 'No button clicks',
         'Links Clicked': Object.keys(Object.fromEntries(linkClicks)).length ? JSON.stringify(Object.fromEntries(linkClicks)) : 'No link clicks',
-        'Session Duration (seconds)': Math.floor(((doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart) / 1000)
+        'Session Duration (seconds)': sessionDurationInSeconds,
+        'Session Duration (H:M:S)': `${hours}h ${minutes}m ${seconds}s`,  // Formatted session duration
+        Country: doc.country || 'Unknown',  // Include country
+        City: doc.city || 'Unknown'         // Include city
       };
     });
+    
 
     // Add the overall total duration (for all users) to the CSV
     csvData.push({
