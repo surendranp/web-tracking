@@ -2,7 +2,7 @@
   const trackingUrl = 'https://web-tracking-mongodburi-08d5.up.railway.app/api/pageviews'; // Replace with your actual API URL
   let sessionTimeout = null;
   let sessionDuration = 0;
-  let sessionStartTime = new Date();
+  let sessionStartTime = new Date(); // Start session time
   
   // Function to get user IP
   async function getUserIP() {
@@ -124,7 +124,7 @@
   // End session on tab close or inactivity
   function endSession() {
     const sessionEndTime = new Date();
-    const sessionDurationInSeconds = (sessionEndTime - sessionStartTime) / 1000;
+    const sessionDurationInSeconds = (sessionEndTime - sessionStartTime) / 1000; // Calculate duration in seconds
 
     sendTrackingData({
       type: 'session_end',
@@ -133,6 +133,8 @@
       sessionDuration: sessionDurationInSeconds,
       timestamp: sessionEndTime.toISOString()
     });
+
+    localStorage.removeItem('sessionId'); // Remove sessionId to start a new session on next page view
   }
 
   // Detect inactivity (mouse/keyboard)
