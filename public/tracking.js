@@ -4,8 +4,7 @@
   let sessionDuration = 0;
   let sessionStartTime = new Date(); // Start session time
   let lastActiveTime = new Date(); // Track the last time the user was active
-  let isUserActive = true; // User is active on the page initially
-  const sessionInactivityLimit = 120000; // 120 seconds of inactivity before ending the session (adjust as needed)
+  const sessionInactivityLimit = 120000; // 120 seconds of inactivity before ending the session
 
   // Function to get user IP
   async function getUserIP() {
@@ -156,7 +155,7 @@
     const now = new Date();
     const timeSinceLastActivity = now - lastActiveTime;
 
-    if (timeSinceLastActivity >= sessionInactivityLimit || !isUserActive) {
+    if (timeSinceLastActivity >= sessionInactivityLimit) {
       endSession();
     }
   }
@@ -164,19 +163,11 @@
   // Track visibility change (switching tabs)
   document.addEventListener('visibilitychange', function() {
     if (document.hidden) {
-      isUserActive = false; // User is not on the page
       endSession(); // End session when user switches tabs
     } else {
-      isUserActive = true; // User returns to the page
       sessionStartTime = new Date(); // Restart session
       resetInactivityTimer(); // Reset inactivity timer
     }
-  });
-
-  // Track focus out of the window (e.g., user switches to another app or tab)
-  window.addEventListener('blur', function() {
-    isUserActive = false; // User is no longer active on this page
-    endSession(); // End session when user leaves the page
   });
 
   // Listen for user activity (mouse, keyboard)
@@ -188,4 +179,6 @@
     endSession();
   });
 
+  // Keep the session active while the user is active
+  resetInactivityTimer(); // Initialize the inactivity timer
 })();

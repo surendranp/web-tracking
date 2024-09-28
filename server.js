@@ -78,7 +78,7 @@ app.post('/api/register', async (req, res) => {
 
 // Tracking endpoint
 app.post('/api/pageviews', async (req, res) => {
-  const { domain, url, type, sessionId, buttonName, linkName,adBlockerActive  } = req.body;
+  const { domain, url, type, sessionId, buttonName, linkName, adBlockerActive } = req.body;
 
   // Handle IPs behind proxies
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
@@ -116,6 +116,9 @@ app.post('/api/pageviews', async (req, res) => {
     let existingTrackingData = await Tracking.findOne({ ip: cleanedIp, sessionId });
 
     if (existingTrackingData) {
+      // Update the existing session end time
+      existingTrackingData.sessionEnd = new Date();  // Update session end time
+
       // Merge the new data with the existing data
       if (type === 'pageview') {
         if (!existingTrackingData.pageviews.includes(url)) {
@@ -128,7 +131,7 @@ app.post('/api/pageviews', async (req, res) => {
         const sanitizedLinkName = linkName ? linkName.replace(/[.\$]/g, '_') : 'Unnamed Link';
         existingTrackingData.links.set(sanitizedLinkName, (existingTrackingData.links.get(sanitizedLinkName) || 0) + 1);
       }
-      existingTrackingData.sessionEnd = new Date();  // Update session end time
+
       existingTrackingData.adBlockerActive = adBlockerActive;  // Update ad blocker status
       // Save the merged data
       await existingTrackingData.save();
@@ -141,8 +144,11 @@ app.post('/api/pageviews', async (req, res) => {
         sessionId,
         pageviews: type === 'pageview' ? [url] : [],
         sessionStart: new Date(),  // Start a new session
+        sessionEnd: new Date(),  // Set session end time as now
         country: geoLocationData.country,
         city: geoLocationData.city,
+        buttons: new Map(),
+        links: new Map(),
         adBlockerActive  // Save ad blocker status
       });
 
@@ -155,6 +161,7 @@ app.post('/api/pageviews', async (req, res) => {
     res.status(500).send('Internal Server Error');
   }
 });
+
 
 
 // Send tracking data to client via email with CSV attachment
