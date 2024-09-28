@@ -341,7 +341,7 @@ async function sendDailyTrackingDataToAllClients() {
 }
 
 // Schedule daily email at 9 AM Indian Time
-cron.schedule('*/2 * * * * *', async () => {
+cron.schedule('0 3 * * * *', async () => {
   console.log('Sending daily tracking data...');
   await sendDailyTrackingDataToAllClients();
 }, {
