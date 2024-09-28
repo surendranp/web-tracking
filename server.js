@@ -84,8 +84,8 @@ app.post('/api/pageviews', async (req, res) => {
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
   const cleanedIp = ip.split(',')[0].trim(); // In case multiple IPs are returned
 
-  if (!domain || !url || !cleanedIp || !sessionId) {
-    return res.status(400).send('Domain, URL, IP, and Session ID are required.');
+  if (!domain || !url || !cleanedIp) {
+    return res.status(400).send('Domain, URL, and IP are required.');
   }
 
   try {
@@ -112,8 +112,8 @@ app.post('/api/pageviews', async (req, res) => {
       console.error('Error fetching geolocation data:', geoError.message);
     }
 
-    // Check if a document with the same IP and sessionId exists
-    let existingTrackingData = await Tracking.findOne({ ip: cleanedIp, sessionId });
+    // Check if a document with the same IP exists (ignoring sessionId)
+    let existingTrackingData = await Tracking.findOne({ ip: cleanedIp });
 
     if (existingTrackingData) {
       // Merge the new data with the existing data
@@ -139,12 +139,12 @@ app.post('/api/pageviews', async (req, res) => {
       // Save the merged data
       await existingTrackingData.save();
     } else {
-      // Create a new tracking document if no existing one found
+      // Create a new tracking document if no existing one found for this IP
       const newTrackingData = new Tracking({
         url,
         type,
         ip: cleanedIp,
-        sessionId,
+        sessionId,  // Store sessionId if needed for reference
         pageviews: type === 'pageview' ? [url] : [],
         sessionStart: new Date(),  // Start a new session
         sessionEnd: new Date(),  // Set session end for new entry
@@ -162,6 +162,7 @@ app.post('/api/pageviews', async (req, res) => {
     res.status(500).send('Internal Server Error');
   }
 });
+
 
 
 // Send tracking data to client via email with CSV attachment
@@ -341,7 +342,7 @@ async function sendDailyTrackingDataToAllClients() {
 }
 
 // Schedule daily email at 9 AM Indian Time
-cron.schedule('* * * * * *', async () => {
+cron.schedule('0 3 * * * *', async () => {
   console.log('Sending daily tracking data...');
   await sendDailyTrackingDataToAllClients();
 }, {
