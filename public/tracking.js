@@ -20,7 +20,7 @@
 
   // Function to get geolocation data
   function getGeolocation() {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (position) => {
@@ -81,65 +81,104 @@
   let sessionId = localStorage.getItem('sessionId') || generateSessionId();
   localStorage.setItem('sessionId', sessionId);
 
-  // Handle pageviews
+  // Track page view
   function trackPageView() {
     sendTrackingData({
-      url: window.location.href,
       type: 'pageview',
-      sessionId: sessionId,
-    });
-  }
-
-  // Handle button clicks
-  function trackButtonClick(event) {
-    const buttonName = event.target.name || event.target.innerText || 'Unnamed Button';
-    sendTrackingData({
       url: window.location.href,
-      type: 'button_click',
-      sessionId: sessionId,
-      buttonName: buttonName
+      timestamp: new Date().toISOString(),
+      sessionId
     });
+    sessionStartTime = new Date(); // Start session
+    lastActiveTime = new Date(); // Reset last active time
   }
 
-  // Handle link clicks
-  function trackLinkClick(event) {
-    const linkName = event.target.href || 'Unnamed Link';
-    sendTrackingData({
-      url: window.location.href,
-      type: 'link_click',
-      sessionId: sessionId,
-      linkName: linkName
-    });
-  }
+  trackPageView(); // Initial page view tracking
 
-  // Track user inactivity and session timeout
-  function resetSessionTimeout() {
-    clearTimeout(sessionTimeout);
-    lastActiveTime = new Date();
-    sessionTimeout = setTimeout(() => {
-      sessionDuration = new Date() - sessionStartTime;
-      sendTrackingData({
-        url: window.location.href,
-        type: 'session_end',
-        sessionId: sessionId,
-        sessionDuration: Math.floor(sessionDuration / 1000)
-      });
-      localStorage.removeItem('sessionId');
-    }, sessionInactivityLimit);
-  }
+  // Track click events
+  document.addEventListener('click', function(event) {
+    let elementName = 'Unnamed Element';
 
-  // Attach event listeners for user interactions
-  document.addEventListener('DOMContentLoaded', trackPageView);
-  document.addEventListener('click', (event) => {
     if (event.target.tagName === 'BUTTON') {
-      trackButtonClick(event);
+      elementName = event.target.innerText || event.target.id || 'Unnamed Button';
+      sendTrackingData({
+        type: 'button_click',
+        buttonName: elementName,
+        url: window.location.href,
+        timestamp: new Date().toISOString(),
+        sessionId
+      });
     } else if (event.target.tagName === 'A') {
-      trackLinkClick(event);
+      elementName = event.target.innerText || event.target.id || 'Unnamed Link';
+      sendTrackingData({
+        type: 'link_click',
+        linkName: elementName,
+        url: window.location.href,
+        timestamp: new Date().toISOString(),
+        sessionId
+      });
     }
-    resetSessionTimeout();
+
+    // Reset inactivity timer on user interaction
+    resetInactivityTimer();
   });
 
-  // Track mouse movement and activity for session timeout
-  document.addEventListener('mousemove', resetSessionTimeout);
-  document.addEventListener('keydown', resetSessionTimeout);
+  // Track page navigation (i.e., navigation path)
+  window.addEventListener('popstate', trackPageView);
+  window.addEventListener('hashchange', trackPageView); // For hash-based routing
+
+  // End session on tab close or inactivity
+  function endSession() {
+    const sessionEndTime = new Date();
+    const sessionDurationInSeconds = (sessionEndTime - sessionStartTime) / 1000; // Calculate duration in seconds
+
+    sendTrackingData({
+      type: 'session_end',
+      sessionId,
+      url: window.location.href,
+      sessionDuration: sessionDurationInSeconds,
+      timestamp: sessionEndTime.toISOString()
+    });
+
+    localStorage.removeItem('sessionId'); // Remove sessionId to start a new session on next page view
+  }
+
+  // Detect inactivity (mouse/keyboard)
+  function resetInactivityTimer() {
+    lastActiveTime = new Date(); // Update the last time user was active
+    if (sessionTimeout) clearTimeout(sessionTimeout);
+    sessionTimeout = setTimeout(checkInactivity, sessionInactivityLimit);  // Check inactivity after defined limit
+  }
+
+  // Function to check for inactivity and end the session if necessary
+  function checkInactivity() {
+    const now = new Date();
+    const timeSinceLastActivity = now - lastActiveTime;
+
+    if (timeSinceLastActivity >= sessionInactivityLimit) {
+      endSession();
+    }
+  }
+
+  // Track visibility change (switching tabs)
+  document.addEventListener('visibilitychange', function() {
+    if (document.hidden) {
+      endSession(); // End session when user switches tabs
+    } else {
+      sessionStartTime = new Date(); // Restart session
+      resetInactivityTimer(); // Reset inactivity timer
+    }
+  });
+
+  // Listen for user activity (mouse, keyboard)
+  document.addEventListener('mousemove', resetInactivityTimer);
+  document.addEventListener('keydown', resetInactivityTimer);
+
+  // End session when user closes tab or window
+  window.addEventListener('beforeunload', function() {
+    endSession();
+  });
+
+  // Keep the session active while the user is active
+  resetInactivityTimer(); // Initialize the inactivity timer
 })();
