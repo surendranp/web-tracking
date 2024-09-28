@@ -1,3 +1,4 @@
+// server.js
 const express = require('express');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
@@ -80,9 +81,8 @@ app.post('/api/register', async (req, res) => {
 app.post('/api/pageviews', async (req, res) => {
   const { domain, url, type, sessionId, buttonName, linkName, adBlockerActive } = req.body;
 
-  // Handle IPs behind proxies
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-  const cleanedIp = ip.split(',')[0].trim(); // In case multiple IPs are returned
+  const cleanedIp = ip.split(',')[0].trim();
 
   if (!domain || !url || !cleanedIp) {
     return res.status(400).send('Domain, URL, and IP are required.');
@@ -96,7 +96,6 @@ app.post('/api/pageviews', async (req, res) => {
       Tracking = mongoose.model(collectionName, TrackingSchema, collectionName);
     }
 
-    // Fetch geolocation data using ipapi or any other IP-based service
     const geoLocationUrl = `https://ipapi.co/${cleanedIp}/json/`;
     let geoLocationData = { country: 'Unknown', city: 'Unknown' };
 
@@ -112,13 +111,10 @@ app.post('/api/pageviews', async (req, res) => {
       console.error('Error fetching geolocation data:', geoError.message);
     }
 
-    // Check if a document with the same IP exists (ignoring sessionId)
     let existingTrackingData = await Tracking.findOne({ ip: cleanedIp });
 
     if (existingTrackingData) {
-      // Merge the new data with the existing data
       if (type === 'pageview') {
-        // Ensure that we store all unique page views
         if (!existingTrackingData.pageviews.includes(url)) {
           existingTrackingData.pageviews.push(url);
         }
@@ -130,27 +126,24 @@ app.post('/api/pageviews', async (req, res) => {
         existingTrackingData.links.set(sanitizedLinkName, (existingTrackingData.links.get(sanitizedLinkName) || 0) + 1);
       }
 
-      // Update the session end time and geolocation details
-      existingTrackingData.sessionEnd = new Date();  
-      existingTrackingData.adBlockerActive = adBlockerActive; 
-      existingTrackingData.country = geoLocationData.country; 
-      existingTrackingData.city = geoLocationData.city; 
+      existingTrackingData.sessionEnd = new Date();
+      existingTrackingData.adBlockerActive = adBlockerActive;
+      existingTrackingData.country = geoLocationData.country;
+      existingTrackingData.city = geoLocationData.city;
 
-      // Save the merged data
       await existingTrackingData.save();
     } else {
-      // Create a new tracking document if no existing one found for this IP
       const newTrackingData = new Tracking({
         url,
         type,
         ip: cleanedIp,
-        sessionId,  // Store sessionId if needed for reference
+        sessionId,
         pageviews: type === 'pageview' ? [url] : [],
-        sessionStart: new Date(),  // Start a new session
-        sessionEnd: new Date(),  // Set session end for new entry
+        sessionStart: new Date(),
+        sessionEnd: new Date(),
         country: geoLocationData.country,
         city: geoLocationData.city,
-        adBlockerActive  // Save ad blocker status
+        adBlockerActive
       });
 
       await newTrackingData.save();
@@ -162,8 +155,6 @@ app.post('/api/pageviews', async (req, res) => {
     res.status(500).send('Internal Server Error');
   }
 });
-
-
 
 // Send tracking data to client via email with CSV attachment
 async function sendTrackingDataToClient(domain, email) {
@@ -195,7 +186,6 @@ async function sendTrackingDataToClient(domain, email) {
       return;
     }
 
-    // Calculate unique users based on IP addresses
     const uniqueUsers = new Set(trackingData.map(doc => doc.ip));
     const userCount = uniqueUsers.size;
     const adBlockerUsers = trackingData.filter(doc => doc.adBlockerActive).length;
@@ -203,7 +193,7 @@ async function sendTrackingDataToClient(domain, email) {
     let totalPageviews = 0;
     let totalButtonClicks = 0;
     let totalLinkClicks = 0;
-    let overallDuration = 0;  // To store the total duration of all users
+    let overallDuration = 0;
 
     trackingData.forEach(doc => {
       totalPageviews += doc.pageviews.length;
@@ -214,43 +204,26 @@ async function sendTrackingDataToClient(domain, email) {
       const linkClicks = doc.links instanceof Map ? doc.links : new Map(Object.entries(doc.links));
       totalLinkClicks += [...linkClicks.values()].reduce((sum, count) => sum + count, 0);
 
-      // Calculate the session duration (if sessionEnd is null, use current time)
       const sessionDuration = ((doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart);
-      overallDuration += sessionDuration; // Add to total duration
+      overallDuration += sessionDuration;
     });
 
-    // Convert overallDuration from milliseconds to hours, minutes, and seconds
     const totalDurationInSeconds = Math.floor(overallDuration / 1000);
     const hours = Math.floor(totalDurationInSeconds / 3600);
     const minutes = Math.floor((totalDurationInSeconds % 3600) / 60);
     const seconds = totalDurationInSeconds % 60;
 
-    // Prepare data for CSV
-    const csvFields = ['URL', 'Timestamp', 'Pageviews', 'Buttons Clicked', 'Links Clicked', 'Session Duration (seconds)','Session Duration (H:M:S)','Country','City'];
-    // const csvData = trackingData.map(doc => {
-    //   const buttonClicks = doc.buttons instanceof Map ? doc.buttons : new Map(Object.entries(doc.buttons));
-    //   const linkClicks = doc.links instanceof Map ? doc.links : new Map(Object.entries(doc.links));
-
-    //   return {
-    //     URL: doc.url,
-    //     Timestamp: new Date(doc.timestamp).toLocaleString(),
-    //     Pageviews: doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews',
-    //     'Buttons Clicked': Object.keys(Object.fromEntries(buttonClicks)).length ? JSON.stringify(Object.fromEntries(buttonClicks)) : 'No button clicks',
-    //     'Links Clicked': Object.keys(Object.fromEntries(linkClicks)).length ? JSON.stringify(Object.fromEntries(linkClicks)) : 'No link clicks',
-    //     'Session Duration (seconds)': Math.floor(((doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart) / 1000)
-    //   };
-    // });
+    const csvFields = ['URL', 'Timestamp', 'Pageviews', 'Buttons Clicked', 'Links Clicked', 'Session Duration (seconds)', 'Session Duration (H:M:S)', 'Country', 'City'];
     const csvData = trackingData.map(doc => {
       const buttonClicks = doc.buttons instanceof Map ? doc.buttons : new Map(Object.entries(doc.buttons));
       const linkClicks = doc.links instanceof Map ? doc.links : new Map(Object.entries(doc.links));
-      
-      // Calculate the session duration
+
       const sessionDurationMs = (doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart;
       const sessionDurationInSeconds = Math.floor(sessionDurationMs / 1000);
       const hours = Math.floor(sessionDurationInSeconds / 3600);
       const minutes = Math.floor((sessionDurationInSeconds % 3600) / 60);
       const seconds = sessionDurationInSeconds % 60;
-    
+
       return {
         URL: doc.url,
         Timestamp: new Date(doc.timestamp).toLocaleString(),
@@ -258,110 +231,49 @@ async function sendTrackingDataToClient(domain, email) {
         'Buttons Clicked': Object.keys(Object.fromEntries(buttonClicks)).length ? JSON.stringify(Object.fromEntries(buttonClicks)) : 'No button clicks',
         'Links Clicked': Object.keys(Object.fromEntries(linkClicks)).length ? JSON.stringify(Object.fromEntries(linkClicks)) : 'No link clicks',
         'Session Duration (seconds)': sessionDurationInSeconds,
-        'Session Duration (H:M:S)': `${hours}h ${minutes}m ${seconds}s`,  // Formatted session duration
-        Country: doc.country || 'Unknown',  // Include country
-        City: doc.city || 'Unknown'         // Include city
+        'Session Duration (H:M:S)': `${hours}:${minutes}:${seconds}`,
+        Country: doc.country || 'Unknown',
+        City: doc.city || 'Unknown'
       };
     });
-    
 
-    // Add the overall total duration (for all users) to the CSV
-    csvData.push({
-      URL: 'Total Duration for All Users',
-      Timestamp: '',
-      Pageviews: '',
-      'Buttons Clicked': '',
-      'Links Clicked': '',
-      'Session Duration (seconds)': `${hours} hours, ${minutes} minutes, ${seconds} seconds`
-    });
-
-    // Convert JSON data to CSV
     const json2csvParser = new Parser({ fields: csvFields });
     const csv = json2csvParser.parse(csvData);
 
-    // Write CSV to a file (temporary file location)
-    const filePath = `./daily_tracking_${domain}.csv`;
-    fs.writeFileSync(filePath, csv);
-
-    // Email content
-    let dataText = `Tracking data for ${domain} (Last 24 Hours):\n\n`;
-    dataText += `Total Unique Users: ${userCount}\n`;
-    dataText += `Total Ad Blocker Users: ${adBlockerUsers}\n`;  // Added ad blocker users count
-    dataText += `Total Pageviews: ${totalPageviews}\n`;
-    dataText += `Total Button Clicks: ${totalButtonClicks}\n`;
-    dataText += `Total Link Clicks: ${totalLinkClicks}\n`;
-    dataText += `Overall Duration for All Users: ${hours} hours, ${minutes} minutes, and ${seconds} seconds\n\n`;
-
-    trackingData.forEach(doc => {
-      const buttonClicks = doc.buttons instanceof Map ? doc.buttons : new Map(Object.entries(doc.buttons));
-      const linksObject = doc.links instanceof Map ? doc.links : new Map(Object.entries(doc.links));
-
-      dataText += `URL: ${doc.url}\n`;
-      dataText += `Timestamp: ${new Date(doc.timestamp).toLocaleString()}\n`;
-      dataText += `Pageviews: ${doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews'}\n`;
-      dataText += `Buttons Clicked: ${Object.keys(Object.fromEntries(buttonClicks)).length ? JSON.stringify(Object.fromEntries(buttonClicks)) : 'No button clicks'}\n`;
-      dataText += `Links Clicked: ${Object.keys(Object.fromEntries(linksObject)).length ? JSON.stringify(Object.fromEntries(linksObject)) : 'No link clicks'}\n\n`;
-    });
-
-    // Email options with attachment
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
-      subject: `Daily Tracking Data for ${domain}`,
-      text: dataText || 'No tracking data available.',
+      subject: `Daily Tracking Report for ${domain}`,
+      text: `Here is your tracking report for ${domain}:\n\nTotal Pageviews: ${totalPageviews}\nTotal Button Clicks: ${totalButtonClicks}\nTotal Link Clicks: ${totalLinkClicks}\nTotal Users: ${userCount}\nTotal Users with Ad Blockers: ${adBlockerUsers}\nOverall Session Duration: ${hours} hours, ${minutes} minutes, ${seconds} seconds.`,
       attachments: [
         {
-          filename: `daily_tracking_${domain}.csv`,
-          path: filePath
+          filename: `${domain}_tracking_report.csv`,
+          content: csv
         }
       ]
     };
 
-    // Send email
     await transporter.sendMail(mailOptions);
-    console.log(`Daily tracking data with CSV attachment sent to ${email}`);
-
-    // Clean up the CSV file after sending the email
-    fs.unlinkSync(filePath);
+    console.log(`Tracking data sent to ${email}`);
   } catch (error) {
-    console.error('Error sending email:', error);
+    console.error('Error sending tracking data email:', error);
   }
 }
 
+// Schedule daily email reports at 9 AM Indian Time
+cron.schedule('* * * * *', async () => {
+  console.log('Running daily report task at 9 AM Indian Time');
+  const registrations = await Registration.find({});
 
-// Send daily tracking data to all registered clients
-async function sendDailyTrackingDataToAllClients() {
-  try {
-    const registrations = await Registration.find({});
-    for (const { domain, email } of registrations) {
-      await sendTrackingDataToClient(domain, email);
-    }
-  } catch (error) {
-    console.error('Error sending daily tracking data to clients:', error);
+  for (const registration of registrations) {
+    await sendTrackingDataToClient(registration.domain, registration.email);
   }
-}
-
-// Schedule daily email at 9 AM Indian Time
-cron.schedule('0 3 * * * *', async () => {
-  console.log('Sending daily tracking data...');
-  await sendDailyTrackingDataToAllClients();
-}, {
-  timezone: 'Asia/Kolkata'
-});
-// Serve dashboard page
-app.get('/dashboard', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/dashboard.html'));
 });
 
-// Serve other pages
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/home.html'));
-});
+// Serve frontend files
+app.use(express.static(path.join(__dirname, 'public')));
 
-app.get('/tracking.js', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/tracking.js'));
-});
-
+// Start the server
 app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+  console.log(`Server running on port ${port}`);
 });
