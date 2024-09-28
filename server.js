@@ -78,14 +78,14 @@ app.post('/api/register', async (req, res) => {
 
 // Tracking endpoint
 app.post('/api/pageviews', async (req, res) => {
-  const { domain, url, type, sessionId, buttonName, linkName, adBlockerActive } = req.body;
+  const { domain, url, type, sessionId, buttonName, linkName,adBlockerActive  } = req.body;
 
   // Handle IPs behind proxies
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
   const cleanedIp = ip.split(',')[0].trim(); // In case multiple IPs are returned
 
-  if (!domain || !url || !cleanedIp) {
-    return res.status(400).send('Domain, URL, and IP are required.');
+  if (!domain || !url || !cleanedIp || !sessionId) {
+    return res.status(400).send('Domain, URL, IP, and Session ID are required.');
   }
 
   try {
@@ -112,13 +112,12 @@ app.post('/api/pageviews', async (req, res) => {
       console.error('Error fetching geolocation data:', geoError.message);
     }
 
-    // Check if a document with the same IP exists (ignoring sessionId)
-    let existingTrackingData = await Tracking.findOne({ ip: cleanedIp });
+    // Check if a document with the same IP and sessionId exists
+    let existingTrackingData = await Tracking.findOne({ ip: cleanedIp, sessionId });
 
     if (existingTrackingData) {
       // Merge the new data with the existing data
       if (type === 'pageview') {
-        // Ensure that we store all unique page views
         if (!existingTrackingData.pageviews.includes(url)) {
           existingTrackingData.pageviews.push(url);
         }
@@ -129,25 +128,19 @@ app.post('/api/pageviews', async (req, res) => {
         const sanitizedLinkName = linkName ? linkName.replace(/[.\$]/g, '_') : 'Unnamed Link';
         existingTrackingData.links.set(sanitizedLinkName, (existingTrackingData.links.get(sanitizedLinkName) || 0) + 1);
       }
-
-      // Update the session end time and geolocation details
-      existingTrackingData.sessionEnd = new Date();  
-      existingTrackingData.adBlockerActive = adBlockerActive; 
-      existingTrackingData.country = geoLocationData.country; 
-      existingTrackingData.city = geoLocationData.city; 
-
+      existingTrackingData.sessionEnd = new Date();  // Update session end time
+      existingTrackingData.adBlockerActive = adBlockerActive;  // Update ad blocker status
       // Save the merged data
       await existingTrackingData.save();
     } else {
-      // Create a new tracking document if no existing one found for this IP
+      // Create a new tracking document if no existing one found
       const newTrackingData = new Tracking({
         url,
         type,
         ip: cleanedIp,
-        sessionId,  // Store sessionId if needed for reference
+        sessionId,
         pageviews: type === 'pageview' ? [url] : [],
         sessionStart: new Date(),  // Start a new session
-        sessionEnd: new Date(),  // Set session end for new entry
         country: geoLocationData.country,
         city: geoLocationData.city,
         adBlockerActive  // Save ad blocker status
@@ -162,7 +155,6 @@ app.post('/api/pageviews', async (req, res) => {
     res.status(500).send('Internal Server Error');
   }
 });
-
 
 
 // Send tracking data to client via email with CSV attachment
@@ -342,7 +334,7 @@ async function sendDailyTrackingDataToAllClients() {
 }
 
 // Schedule daily email at 9 AM Indian Time
-cron.schedule('0 3 * * * *', async () => {
+cron.schedule('0 3 * * *', async () => {
   console.log('Sending daily tracking data...');
   await sendDailyTrackingDataToAllClients();
 }, {

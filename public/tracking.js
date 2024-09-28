@@ -1,10 +1,6 @@
 (function() {
   const trackingUrl = 'https://web-tracking-mongodburi-08d5.up.railway.app/api/pageviews'; // Replace with your actual API URL
-  let sessionTimeout = null;
-  let sessionDuration = 0;
-  let sessionStartTime = new Date(); // Start session time
-  let lastActiveTime = new Date(); // Track the last time the user was active
-  const sessionInactivityLimit = 120000; // 120 seconds of inactivity before ending the session
+  
 
   // Function to get user IP
   async function getUserIP() {
@@ -45,22 +41,20 @@
   function generateSessionId() {
     return Math.random().toString(36).substr(2, 9);
   }
-
-  // Function to check for ad blockers
-  function isAdBlockerActive() {
-    return new Promise((resolve) => {
-      const adTest = document.createElement('div');
-      adTest.innerHTML = '&nbsp;';
-      adTest.className = 'adsbox';
-      document.body.appendChild(adTest);
-      window.setTimeout(() => {
-        const isBlocked = (adTest.offsetHeight === 0);
-        adTest.remove();
-        resolve(isBlocked);
-      }, 100);
-    });
-  }
-
+ // Function to check for ad blockers
+ function isAdBlockerActive() {
+  return new Promise((resolve) => {
+    const adTest = document.createElement('div');
+    adTest.innerHTML = '&nbsp;';
+    adTest.className = 'adsbox';
+    document.body.appendChild(adTest);
+    window.setTimeout(() => {
+      const isBlocked = (adTest.offsetHeight === 0);
+      adTest.remove();
+      resolve(isBlocked);
+    }, 100);
+  });
+}
   // Function to send tracking data to the server
   async function sendTrackingData(data) {
     const ip = await getUserIP();
@@ -89,8 +83,6 @@
       timestamp: new Date().toISOString(),
       sessionId
     });
-    sessionStartTime = new Date(); // Start session
-    lastActiveTime = new Date(); // Reset last active time
   }
 
   trackPageView(); // Initial page view tracking
@@ -118,67 +110,9 @@
         sessionId
       });
     }
-
-    // Reset inactivity timer on user interaction
-    resetInactivityTimer();
   });
 
   // Track page navigation (i.e., navigation path)
   window.addEventListener('popstate', trackPageView);
   window.addEventListener('hashchange', trackPageView); // For hash-based routing
-
-  // End session on tab close or inactivity
-  function endSession() {
-    const sessionEndTime = new Date();
-    const sessionDurationInSeconds = (sessionEndTime - sessionStartTime) / 1000; // Calculate duration in seconds
-
-    sendTrackingData({
-      type: 'session_end',
-      sessionId,
-      url: window.location.href,
-      sessionDuration: sessionDurationInSeconds,
-      timestamp: sessionEndTime.toISOString()
-    });
-
-    localStorage.removeItem('sessionId'); // Remove sessionId to start a new session on next page view
-  }
-
-  // Detect inactivity (mouse/keyboard)
-  function resetInactivityTimer() {
-    lastActiveTime = new Date(); // Update the last time user was active
-    if (sessionTimeout) clearTimeout(sessionTimeout);
-    sessionTimeout = setTimeout(checkInactivity, sessionInactivityLimit);  // Check inactivity after defined limit
-  }
-
-  // Function to check for inactivity and end the session if necessary
-  function checkInactivity() {
-    const now = new Date();
-    const timeSinceLastActivity = now - lastActiveTime;
-
-    if (timeSinceLastActivity >= sessionInactivityLimit) {
-      endSession();
-    }
-  }
-
-  // Track visibility change (switching tabs)
-  document.addEventListener('visibilitychange', function() {
-    if (document.hidden) {
-      endSession(); // End session when user switches tabs
-    } else {
-      sessionStartTime = new Date(); // Restart session
-      resetInactivityTimer(); // Reset inactivity timer
-    }
-  });
-
-  // Listen for user activity (mouse, keyboard)
-  document.addEventListener('mousemove', resetInactivityTimer);
-  document.addEventListener('keydown', resetInactivityTimer);
-
-  // End session when user closes tab or window
-  window.addEventListener('beforeunload', function() {
-    endSession();
-  });
-
-  // Keep the session active while the user is active
-  resetInactivityTimer(); // Initialize the inactivity timer
 })();
