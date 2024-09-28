@@ -116,9 +116,6 @@ app.post('/api/pageviews', async (req, res) => {
     let existingTrackingData = await Tracking.findOne({ ip: cleanedIp, sessionId });
 
     if (existingTrackingData) {
-      // Update the existing session end time
-      existingTrackingData.sessionEnd = new Date();  // Update session end time
-
       // Merge the new data with the existing data
       if (type === 'pageview') {
         if (!existingTrackingData.pageviews.includes(url)) {
@@ -132,7 +129,11 @@ app.post('/api/pageviews', async (req, res) => {
         existingTrackingData.links.set(sanitizedLinkName, (existingTrackingData.links.get(sanitizedLinkName) || 0) + 1);
       }
 
+      existingTrackingData.sessionEnd = new Date();  // Update session end time
       existingTrackingData.adBlockerActive = adBlockerActive;  // Update ad blocker status
+      existingTrackingData.country = geoLocationData.country; // Update country
+      existingTrackingData.city = geoLocationData.city; // Update city
+
       // Save the merged data
       await existingTrackingData.save();
     } else {
@@ -144,11 +145,8 @@ app.post('/api/pageviews', async (req, res) => {
         sessionId,
         pageviews: type === 'pageview' ? [url] : [],
         sessionStart: new Date(),  // Start a new session
-        sessionEnd: new Date(),  // Set session end time as now
         country: geoLocationData.country,
         city: geoLocationData.city,
-        buttons: new Map(),
-        links: new Map(),
         adBlockerActive  // Save ad blocker status
       });
 
@@ -161,6 +159,7 @@ app.post('/api/pageviews', async (req, res) => {
     res.status(500).send('Internal Server Error');
   }
 });
+
 
 
 
