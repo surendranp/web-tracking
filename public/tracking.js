@@ -3,7 +3,10 @@
   let sessionTimeout = null;
   let sessionDuration = 0;
   let sessionStartTime = new Date(); // Start session time
-  
+  let lastActiveTime = new Date(); // Track the last time the user was active
+  let isUserActive = true; // User is active on the page initially
+  const sessionInactivityLimit = 120000; // 120 seconds of inactivity before ending the session (adjust as needed)
+
   // Function to get user IP
   async function getUserIP() {
     try {
@@ -88,6 +91,7 @@
       sessionId
     });
     sessionStartTime = new Date(); // Start session
+    lastActiveTime = new Date(); // Reset last active time
   }
 
   trackPageView(); // Initial page view tracking
@@ -115,6 +119,9 @@
         sessionId
       });
     }
+
+    // Reset inactivity timer on user interaction
+    resetInactivityTimer();
   });
 
   // Track page navigation (i.e., navigation path)
@@ -139,23 +146,42 @@
 
   // Detect inactivity (mouse/keyboard)
   function resetInactivityTimer() {
+    lastActiveTime = new Date(); // Update the last time user was active
     if (sessionTimeout) clearTimeout(sessionTimeout);
-    sessionTimeout = setTimeout(endSession, 120000);  // End session after 120 seconds of inactivity
+    sessionTimeout = setTimeout(checkInactivity, sessionInactivityLimit);  // Check inactivity after defined limit
   }
 
-  // Listen for user activity
-  document.addEventListener('mousemove', resetInactivityTimer);
-  document.addEventListener('keydown', resetInactivityTimer);
+  // Function to check for inactivity and end the session if necessary
+  function checkInactivity() {
+    const now = new Date();
+    const timeSinceLastActivity = now - lastActiveTime;
+
+    if (timeSinceLastActivity >= sessionInactivityLimit || !isUserActive) {
+      endSession();
+    }
+  }
 
   // Track visibility change (switching tabs)
   document.addEventListener('visibilitychange', function() {
     if (document.hidden) {
-      endSession();
+      isUserActive = false; // User is not on the page
+      endSession(); // End session when user switches tabs
+    } else {
+      isUserActive = true; // User returns to the page
+      sessionStartTime = new Date(); // Restart session
+      resetInactivityTimer(); // Reset inactivity timer
     }
   });
 
-  // Start inactivity timer on page load
-  resetInactivityTimer();
+  // Track focus out of the window (e.g., user switches to another app or tab)
+  window.addEventListener('blur', function() {
+    isUserActive = false; // User is no longer active on this page
+    endSession(); // End session when user leaves the page
+  });
+
+  // Listen for user activity (mouse, keyboard)
+  document.addEventListener('mousemove', resetInactivityTimer);
+  document.addEventListener('keydown', resetInactivityTimer);
 
   // End session when user closes tab or window
   window.addEventListener('beforeunload', function() {
