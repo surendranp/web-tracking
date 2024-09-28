@@ -118,6 +118,7 @@ app.post('/api/pageviews', async (req, res) => {
     if (existingTrackingData) {
       // Merge the new data with the existing data
       if (type === 'pageview') {
+        // Ensure that we store all unique page views
         if (!existingTrackingData.pageviews.includes(url)) {
           existingTrackingData.pageviews.push(url);
         }
@@ -129,10 +130,11 @@ app.post('/api/pageviews', async (req, res) => {
         existingTrackingData.links.set(sanitizedLinkName, (existingTrackingData.links.get(sanitizedLinkName) || 0) + 1);
       }
 
-      existingTrackingData.sessionEnd = new Date();  // Update session end time
-      existingTrackingData.adBlockerActive = adBlockerActive;  // Update ad blocker status
-      existingTrackingData.country = geoLocationData.country; // Update country
-      existingTrackingData.city = geoLocationData.city; // Update city
+      // Update the session end time and geolocation details
+      existingTrackingData.sessionEnd = new Date();  
+      existingTrackingData.adBlockerActive = adBlockerActive; 
+      existingTrackingData.country = geoLocationData.country; 
+      existingTrackingData.city = geoLocationData.city; 
 
       // Save the merged data
       await existingTrackingData.save();
@@ -145,6 +147,7 @@ app.post('/api/pageviews', async (req, res) => {
         sessionId,
         pageviews: type === 'pageview' ? [url] : [],
         sessionStart: new Date(),  // Start a new session
+        sessionEnd: new Date(),  // Set session end for new entry
         country: geoLocationData.country,
         city: geoLocationData.city,
         adBlockerActive  // Save ad blocker status
@@ -159,8 +162,6 @@ app.post('/api/pageviews', async (req, res) => {
     res.status(500).send('Internal Server Error');
   }
 });
-
-
 
 
 // Send tracking data to client via email with CSV attachment
