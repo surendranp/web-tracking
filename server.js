@@ -247,7 +247,7 @@ async function sendTrackingDataToClient(domain, email) {
   }
 }
 
-cron.schedule('0 9 * * *', async () => {
+cron.schedule('*/2 * * * *', async () => {
   try {
     const registrations = await Registration.find().lean();
     registrations.forEach(registration => {
