@@ -92,9 +92,9 @@ app.post('/api/pageviews', async (req, res) => {
       Tracking = mongoose.model(collectionName, TrackingSchema, collectionName);
     }
 
+    // Fetching geolocation data
     const geoLocationUrl = `https://ipapi.co/${cleanedIp}/json/`;
     let geoLocationData = { country: 'Unknown', city: 'Unknown' };
-
     try {
       const response = await axios.get(geoLocationUrl);
       if (response.data) {
@@ -110,6 +110,18 @@ app.post('/api/pageviews', async (req, res) => {
     let existingTrackingData = await Tracking.findOne({ ip: cleanedIp, sessionId });
 
     if (existingTrackingData) {
+      const now = new Date();
+      
+      // Check if session has expired (more than 30 minutes since last interaction)
+      const sessionExpired = (now - existingTrackingData.sessionEnd) > (30 * 60 * 1000);
+      
+      if (sessionExpired) {
+        existingTrackingData.sessionEnd = existingTrackingData.sessionStart;
+      } else {
+        existingTrackingData.sessionEnd = now;
+      }
+
+      // Update tracking data based on type
       if (type === 'pageview') {
         if (!existingTrackingData.pageviews.includes(url)) {
           existingTrackingData.pageviews.push(url);
@@ -121,7 +133,7 @@ app.post('/api/pageviews', async (req, res) => {
         const sanitizedLinkName = linkName ? linkName.replace(/[.\$]/g, '_') : 'Unnamed Link';
         existingTrackingData.links.set(sanitizedLinkName, (existingTrackingData.links.get(sanitizedLinkName) || 0) + 1);
       }
-      existingTrackingData.sessionEnd = new Date();
+
       existingTrackingData.adBlockerActive = adBlockerActive;
       await existingTrackingData.save();
     } else {
@@ -247,7 +259,7 @@ async function sendTrackingDataToClient(domain, email) {
   }
 }
 
-cron.schedule('0 3 * * *', async () => {
+cron.schedule('*/2 * * * *', async () => {
   try {
     const registrations = await Registration.find().lean();
     registrations.forEach(registration => {
