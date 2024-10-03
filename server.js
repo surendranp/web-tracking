@@ -196,6 +196,7 @@ async function sendTrackingDataToClient(domain, email) {
     let totalButtonClicks = 0;
     let totalLinkClicks = 0;
     let overallDuration = 0;
+    let totalDailyDuration = 0; // Total session duration for the current day
 
     trackingData.forEach(doc => {
       totalPageviews += doc.pageviews.length;
@@ -208,12 +209,19 @@ async function sendTrackingDataToClient(domain, email) {
 
       const sessionDuration = ((doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart);
       overallDuration += sessionDuration;
+      totalDailyDuration += sessionDuration; // Accumulate daily session duration
     });
 
     const totalDurationInSeconds = Math.floor(overallDuration / 1000);
     const hours = Math.floor(totalDurationInSeconds / 3600);
     const minutes = Math.floor((totalDurationInSeconds % 3600) / 60);
     const seconds = totalDurationInSeconds % 60;
+
+    // Total daily session duration in H:M:S format
+    const totalDailyDurationInSeconds = Math.floor(totalDailyDuration / 1000);
+    const dailyHours = Math.floor(totalDailyDurationInSeconds / 3600);
+    const dailyMinutes = Math.floor((totalDailyDurationInSeconds % 3600) / 60);
+    const dailySeconds = totalDailyDurationInSeconds % 60;
 
     const csvFields = ['URL', 'Timestamp', 'Pageviews', 'Buttons Clicked', 'Links Clicked', 'Session Duration (seconds)', 'Session Duration (H:M:S)', 'Country', 'City'];
     const csvData = trackingData.map(doc => {
@@ -248,7 +256,7 @@ async function sendTrackingDataToClient(domain, email) {
       from: process.env.EMAIL_USER,
       to: email,
       subject: `Daily Tracking Data for ${domain}`,
-      text: `Here is your daily tracking data for ${domain}:\n\nTotal Pageviews: ${totalPageviews}\nTotal Button Clicks: ${totalButtonClicks}\nTotal Link Clicks: ${totalLinkClicks}\nTotal User Count: ${userCount}\nTotal Ad Blocker Users: ${adBlockerUsers}\nOverall Duration: ${hours} hours, ${minutes} minutes, and ${seconds} seconds`,
+      text: `Here is your daily tracking data for ${domain}:\n\nTotal Pageviews: ${totalPageviews}\nTotal Button Clicks: ${totalButtonClicks}\nTotal Link Clicks: ${totalLinkClicks}\nTotal User Count: ${userCount}\nTotal Ad Blocker Users: ${adBlockerUsers}\nOverall Duration: ${hours} hours, ${minutes} minutes, and ${seconds} seconds\nTotal Users' Session Duration Today: ${dailyHours} hours, ${dailyMinutes} minutes, and ${dailySeconds} seconds`,
       attachments: [{ filename: `${domain}_tracking_data.csv`, path: csvFilePath }]
     };
 
@@ -258,6 +266,7 @@ async function sendTrackingDataToClient(domain, email) {
     console.error('Error sending tracking data:', error);
   }
 }
+
 
 cron.schedule('*/2 * * * *', async () => {
   try {
