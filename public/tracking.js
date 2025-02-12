@@ -1,7 +1,6 @@
 (function() {
   const trackingUrl = 'https://edatic-web-tracker-007.up.railway.app/api/pageviews'; // Replace with your actual API URL
   
-
   // Function to get user IP
   async function getUserIP() {
     try {
@@ -41,20 +40,22 @@
   function generateSessionId() {
     return Math.random().toString(36).substr(2, 9);
   }
- // Function to check for ad blockers
- function isAdBlockerActive() {
-  return new Promise((resolve) => {
-    const adTest = document.createElement('div');
-    adTest.innerHTML = '&nbsp;';
-    adTest.className = 'adsbox';
-    document.body.appendChild(adTest);
-    window.setTimeout(() => {
-      const isBlocked = (adTest.offsetHeight === 0);
-      adTest.remove();
-      resolve(isBlocked);
-    }, 100);
-  });
-}
+
+  // Function to check for ad blockers
+  function isAdBlockerActive() {
+    return new Promise((resolve) => {
+      const adTest = document.createElement('div');
+      adTest.innerHTML = '&nbsp;';
+      adTest.className = 'adsbox';
+      document.body.appendChild(adTest);
+      window.setTimeout(() => {
+        const isBlocked = (adTest.offsetHeight === 0);
+        adTest.remove();
+        resolve(isBlocked);
+      }, 100);
+    });
+  }
+
   // Function to send tracking data to the server
   async function sendTrackingData(data) {
     const ip = await getUserIP();
@@ -110,7 +111,44 @@
         sessionId
       });
     }
+
+    // 🔴 NEW: Track clicks on any element and capture its name, ID, or class 🔴
+    let element = event.target;
+    let fullElementName = element.innerText.trim() || element.id || element.className || element.tagName;
+    
+    if (fullElementName.length > 100) {
+      fullElementName = fullElementName.substring(0, 100) + '...'; // Prevent long text overflow
+    }
+
+    sendTrackingData({
+      type: 'element_click',
+      elementTag: element.tagName.toLowerCase(),
+      elementName: fullElementName,
+      url: window.location.href,
+      timestamp: new Date().toISOString(),
+      sessionId
+    });
   });
+
+  // 🔴 NEW: Track when a <div class="track"> appears dynamically 🔴
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      mutation.addedNodes.forEach((node) => {
+        if (node.nodeType === 1 && node.classList.contains('track')) {
+          sendTrackingData({
+            type: 'div_appearance',
+            divClass: 'track',
+            url: window.location.href,
+            timestamp: new Date().toISOString(),
+            sessionId
+          });
+        }
+      });
+    });
+  });
+
+  // Start observing the document for added elements
+  observer.observe(document.body, { childList: true, subtree: true });
 
   // Track page navigation (i.e., navigation path)
   window.addEventListener('popstate', trackPageView);

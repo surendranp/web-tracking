@@ -44,6 +44,7 @@ const TrackingSchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now },
   buttons: { type: Map, of: Number, default: {} },
   links: { type: Map, of: Number, default: {} },
+  elements: { type: Map, of: Number, default: {} },
   pageviews: [String],
   sessionStart: { type: Date, default: Date.now },  // Session start time
   sessionEnd: { type: Date },  // Session end time
@@ -78,7 +79,7 @@ app.post('/api/register', async (req, res) => {
 
 // Tracking endpoint
 app.post('/api/pageviews', async (req, res) => {
-  const { domain, url, type, sessionId, buttonName, linkName,adBlockerActive  } = req.body;
+  const { domain, url, type, sessionId, buttonName, linkName, elementName, elementTag, adBlockerActive } = req.body;
 
   // Handle IPs behind proxies
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
@@ -127,9 +128,16 @@ app.post('/api/pageviews', async (req, res) => {
       } else if (type === 'link_click') {
         const sanitizedLinkName = linkName ? linkName.replace(/[.\$]/g, '_') : 'Unnamed Link';
         existingTrackingData.links.set(sanitizedLinkName, (existingTrackingData.links.get(sanitizedLinkName) || 0) + 1);
+      } 
+      // 🔴 NEW: Track clicks on any element (div, img, span, etc.)
+      else if (type === 'element_click') {
+        const sanitizedElementName = elementName ? elementName.replace(/[.\$]/g, '_') : elementTag || 'Unnamed Element';
+        existingTrackingData.elements.set(sanitizedElementName, (existingTrackingData.elements.get(sanitizedElementName) || 0) + 1);
       }
+
       existingTrackingData.sessionEnd = new Date();  // Update session end time
       existingTrackingData.adBlockerActive = adBlockerActive;  // Update ad blocker status
+
       // Save the merged data
       await existingTrackingData.save();
     } else {
@@ -140,6 +148,9 @@ app.post('/api/pageviews', async (req, res) => {
         ip: cleanedIp,
         sessionId,
         pageviews: type === 'pageview' ? [url] : [],
+        buttons: type === 'button_click' ? { [buttonName]: 1 } : {},
+        links: type === 'link_click' ? { [linkName]: 1 } : {},
+        elements: type === 'element_click' ? { [elementName]: 1 } : {}, // 🔴 NEW: Store element click
         sessionStart: new Date(),  // Start a new session
         country: geoLocationData.country,
         city: geoLocationData.city,
@@ -195,6 +206,7 @@ async function sendTrackingDataToClient(domain, email) {
     let totalPageviews = 0;
     let totalButtonClicks = 0;
     let totalLinkClicks = 0;
+    let totalElementClicks = 0; // 🔴 NEW: Track total element clicks
     let overallDuration = 0;  // To store the total duration of all users
 
     trackingData.forEach(doc => {
@@ -206,9 +218,12 @@ async function sendTrackingDataToClient(domain, email) {
       const linkClicks = doc.links instanceof Map ? doc.links : new Map(Object.entries(doc.links));
       totalLinkClicks += [...linkClicks.values()].reduce((sum, count) => sum + count, 0);
 
+      const elementClicks = doc.elements instanceof Map ? doc.elements : new Map(Object.entries(doc.elements)); // 🔴 NEW
+      totalElementClicks += [...elementClicks.values()].reduce((sum, count) => sum + count, 0); // 🔴 NEW
+
       // Calculate the session duration (if sessionEnd is null, use current time)
       const sessionDuration = ((doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart);
-      overallDuration += sessionDuration; // Add to total duration
+      overallDuration += sessionDuration;
     });
 
     // Convert overallDuration from milliseconds to hours, minutes, and seconds
@@ -218,24 +233,18 @@ async function sendTrackingDataToClient(domain, email) {
     const seconds = totalDurationInSeconds % 60;
 
     // Prepare data for CSV
-    const csvFields = ['URL', 'Timestamp', 'Pageviews', 'Buttons Clicked', 'Links Clicked', 'Session Duration (seconds)','Session Duration (H:M:S)','Country','City'];
-    // const csvData = trackingData.map(doc => {
-    //   const buttonClicks = doc.buttons instanceof Map ? doc.buttons : new Map(Object.entries(doc.buttons));
-    //   const linkClicks = doc.links instanceof Map ? doc.links : new Map(Object.entries(doc.links));
-
-    //   return {
-    //     URL: doc.url,
-    //     Timestamp: new Date(doc.timestamp).toLocaleString(),
-    //     Pageviews: doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews',
-    //     'Buttons Clicked': Object.keys(Object.fromEntries(buttonClicks)).length ? JSON.stringify(Object.fromEntries(buttonClicks)) : 'No button clicks',
-    //     'Links Clicked': Object.keys(Object.fromEntries(linkClicks)).length ? JSON.stringify(Object.fromEntries(linkClicks)) : 'No link clicks',
-    //     'Session Duration (seconds)': Math.floor(((doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart) / 1000)
-    //   };
-    // });
+    const csvFields = [
+      'URL', 'Timestamp', 'Pageviews', 
+      'Buttons Clicked', 'Links Clicked', 'Elements Clicked', // 🔴 NEW: Elements Clicked
+      'Session Duration (seconds)', 'Session Duration (H:M:S)', 
+      'Country', 'City'
+    ];
+    
     const csvData = trackingData.map(doc => {
       const buttonClicks = doc.buttons instanceof Map ? doc.buttons : new Map(Object.entries(doc.buttons));
       const linkClicks = doc.links instanceof Map ? doc.links : new Map(Object.entries(doc.links));
-      
+      const elementClicks = doc.elements instanceof Map ? doc.elements : new Map(Object.entries(doc.elements)); // 🔴 NEW
+
       // Calculate the session duration
       const sessionDurationMs = (doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart;
       const sessionDurationInSeconds = Math.floor(sessionDurationMs / 1000);
@@ -249,13 +258,13 @@ async function sendTrackingDataToClient(domain, email) {
         Pageviews: doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews',
         'Buttons Clicked': Object.keys(Object.fromEntries(buttonClicks)).length ? JSON.stringify(Object.fromEntries(buttonClicks)) : 'No button clicks',
         'Links Clicked': Object.keys(Object.fromEntries(linkClicks)).length ? JSON.stringify(Object.fromEntries(linkClicks)) : 'No link clicks',
+        'Elements Clicked': Object.keys(Object.fromEntries(elementClicks)).length ? JSON.stringify(Object.fromEntries(elementClicks)) : 'No element clicks', // 🔴 NEW
         'Session Duration (seconds)': sessionDurationInSeconds,
         'Session Duration (H:M:S)': `${hours}h ${minutes}m ${seconds}s`,  // Formatted session duration
-        Country: doc.country || 'Unknown',  // Include country
-        City: doc.city || 'Unknown'         // Include city
+        Country: doc.country || 'Unknown',
+        City: doc.city || 'Unknown'
       };
     });
-    
 
     // Add the overall total duration (for all users) to the CSV
     csvData.push({
@@ -264,6 +273,7 @@ async function sendTrackingDataToClient(domain, email) {
       Pageviews: '',
       'Buttons Clicked': '',
       'Links Clicked': '',
+      'Elements Clicked': '',
       'Session Duration (seconds)': `${hours} hours, ${minutes} minutes, ${seconds} seconds`
     });
 
@@ -278,21 +288,24 @@ async function sendTrackingDataToClient(domain, email) {
     // Email content
     let dataText = `Tracking data for ${domain} (Last 24 Hours):\n\n`;
     dataText += `Total Unique Users: ${userCount}\n`;
-    dataText += `Total Ad Blocker Users: ${adBlockerUsers}\n`;  // Added ad blocker users count
+    dataText += `Total Ad Blocker Users: ${adBlockerUsers}\n`;
     dataText += `Total Pageviews: ${totalPageviews}\n`;
     dataText += `Total Button Clicks: ${totalButtonClicks}\n`;
     dataText += `Total Link Clicks: ${totalLinkClicks}\n`;
+    dataText += `Total Element Clicks: ${totalElementClicks}\n`; // 🔴 NEW
     dataText += `Overall Duration for All Users: ${hours} hours, ${minutes} minutes, and ${seconds} seconds\n\n`;
 
     trackingData.forEach(doc => {
       const buttonClicks = doc.buttons instanceof Map ? doc.buttons : new Map(Object.entries(doc.buttons));
       const linksObject = doc.links instanceof Map ? doc.links : new Map(Object.entries(doc.links));
+      const elementsObject = doc.elements instanceof Map ? doc.elements : new Map(Object.entries(doc.elements)); // 🔴 NEW
 
       dataText += `URL: ${doc.url}\n`;
       dataText += `Timestamp: ${new Date(doc.timestamp).toLocaleString()}\n`;
       dataText += `Pageviews: ${doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews'}\n`;
       dataText += `Buttons Clicked: ${Object.keys(Object.fromEntries(buttonClicks)).length ? JSON.stringify(Object.fromEntries(buttonClicks)) : 'No button clicks'}\n`;
-      dataText += `Links Clicked: ${Object.keys(Object.fromEntries(linksObject)).length ? JSON.stringify(Object.fromEntries(linksObject)) : 'No link clicks'}\n\n`;
+      dataText += `Links Clicked: ${Object.keys(Object.fromEntries(linksObject)).length ? JSON.stringify(Object.fromEntries(linksObject)) : 'No link clicks'}\n`;
+      dataText += `Elements Clicked: ${Object.keys(Object.fromEntries(elementsObject)).length ? JSON.stringify(Object.fromEntries(elementsObject)) : 'No element clicks'}\n\n`; // 🔴 NEW
     });
 
     // Email options with attachment
@@ -301,12 +314,7 @@ async function sendTrackingDataToClient(domain, email) {
       to: email,
       subject: `Daily Tracking Data for ${domain}`,
       text: dataText || 'No tracking data available.',
-      attachments: [
-        {
-          filename: `daily_tracking_${domain}.csv`,
-          path: filePath
-        }
-      ]
+      attachments: [{ filename: `daily_tracking_${domain}.csv`, path: filePath }]
     };
 
     // Send email
@@ -319,7 +327,6 @@ async function sendTrackingDataToClient(domain, email) {
     console.error('Error sending email:', error);
   }
 }
-
 
 // Send daily tracking data to all registered clients
 async function sendDailyTrackingDataToAllClients() {
