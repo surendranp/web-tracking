@@ -4,25 +4,241 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard</title>
+    <style>
+        body {
+            display: flex;
+            font-family: Arial, sans-serif;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+        #sidebar {
+            width: 250px;
+            height: 100vh;
+            background: #333;
+            color: white;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        #sidebar ul {
+            list-style: none;
+            padding: 0;
+        }
+        #sidebar li {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #555;
+            transition: background 0.3s;
+        }
+        #sidebar li:hover {
+            background: #444;
+        }
+        #sidebar li.active {
+            background: #007bff;
+            color: white;
+            font-weight: bold;
+        }
+        #content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        .table-container {
+            max-height: 500px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            margin-bottom: 40px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        table, th, td {
+            border: 1px solid #ccc;
+            text-align: left;
+            padding: 8px;
+        }
+        th {
+            background: #f4f4f4;
+            position: sticky;
+            top: 0;
+            z-index: 2;
+        }
+    </style>
 </head>
 <body>
-    <h1>Website Tracking Dashboard</h1>
-    <div id="data-container">
-        <!-- Tracked data will be dynamically inserted here -->
+
+    <!-- Sidebar -->
+    <div id="sidebar">
+        <h3>Registered Clients</h3>
+        <ul id="clientList"></ul>
     </div>
+
+    <!-- Main Content -->
+    <div id="content">
+        <h2>Client Details</h2>
+
+        <!-- Table 1: General Client Tracking Data -->
+        <div class="table-container">
+            <h3>Tracking Data</h3>
+            <table id="clientTable">
+                <thead>
+                    <tr id="tableHead"></tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+
+        <!-- Table 2: Elements Data -->
+        <div class="table-container">
+            <h3>Element Data</h3>
+            <table id="elementsTable">
+                <thead>
+                    <tr id="elementsHead"></tr>
+                </thead>
+                <tbody id="elementsBody"></tbody>
+            </table>
+        </div>
+
+    </div>
+
     <script>
-        // Fetch and display tracked data
-        fetch('/api/pageviews')
-            .then(response => response.json())
-            .then(data => {
-                const container = document.getElementById('data-container');
-                data.forEach(item => {
-                    const div = document.createElement('div');
-                    div.textContent = `${item.type} - ${item.url} - ${item.timestamp}`;
-                    container.appendChild(div);
-                });
-            })
-            .catch(error => console.error('Error fetching tracked data:', error));
+        async function loadClients() {
+            const response = await fetch('/api/clients');
+            const clients = await response.json();
+            const clientList = document.getElementById('clientList');
+
+            clientList.innerHTML = '';
+            clients.forEach(client => {
+                const li = document.createElement('li');
+                li.textContent = client.domain;
+                li.onclick = () => selectClient(li, client.domain);
+                clientList.appendChild(li);
+            });
+        }
+
+        function selectClient(selectedElement, domain) {
+            document.querySelectorAll("#sidebar li").forEach(li => li.classList.remove("active"));
+            selectedElement.classList.add("active");
+            loadClientData(domain);
+        }
+
+        async function loadClientData(domain) {
+            const response = await fetch(`/api/client-data/${domain}`);
+            const data = await response.json();
+
+            if (data.length === 0) {
+                document.getElementById('clientTable').style.display = "none";
+                document.getElementById('elementsTable').style.display = "none";
+                return;
+            }
+
+            document.getElementById('clientTable').style.display = "table";
+            document.getElementById('elementsTable').style.display = "table";
+
+            // Populate Tracking Data Table
+            populateTrackingTable(data);
+
+            // Populate Elements Table
+            populateElementsTable(data);
+        }
+
+        function populateTrackingTable(data) {
+            const tableHead = document.getElementById('tableHead');
+            tableHead.innerHTML = '';
+            const tableBody = document.getElementById('tableBody');
+            tableBody.innerHTML = '';
+
+            // Table Headers with S.No Column
+            const headers = ["S.No", "URL", "Type", "IP", "Session ID", "Buttons", "Links", "Pageviews", "Session Start", "Session End", "Country", "City"];
+            headers.forEach(header => {
+                const th = document.createElement('th');
+                th.textContent = header;
+                tableHead.appendChild(th);
+            });
+
+            // Populate Rows
+            data.forEach((item, index) => {
+                const tr = document.createElement('tr');
+
+                tr.appendChild(createCell(index + 1));
+                tr.appendChild(createCell(item.url));
+                tr.appendChild(createCell(item.type));
+                tr.appendChild(createCell(item.ip));
+                tr.appendChild(createCell(item.sessionId));
+                tr.appendChild(createCell(formatObject(item.buttons)));
+                tr.appendChild(createCell(formatObject(item.links)));
+                tr.appendChild(createCell(item.pageviews ? item.pageviews.join(", ") : "N/A"));
+                tr.appendChild(createCell(formatDate(item.sessionStart)));
+                tr.appendChild(createCell(formatDate(item.sessionEnd)));
+                tr.appendChild(createCell(item.country || "Unknown"));
+                tr.appendChild(createCell(item.city || "Unknown"));
+
+                tableBody.appendChild(tr);
+            });
+        }
+
+        function populateElementsTable(data) {
+    const elementsHead = document.getElementById('elementsHead');
+    elementsHead.innerHTML = '';
+    const elementsBody = document.getElementById('elementsBody');
+    elementsBody.innerHTML = '';
+
+    // Extract all unique keys from elements objects
+    let uniqueKeys = new Set();
+    data.forEach(item => {
+        if (item.elements) {
+            Object.keys(item.elements).forEach(key => uniqueKeys.add(key));
+        }
+    });
+
+    // Create Header Row
+    const serialTh = document.createElement('th');
+    serialTh.textContent = "S.No"; 
+    elementsHead.appendChild(serialTh);
+
+    uniqueKeys.forEach(key => {
+        const th = document.createElement('th');
+        th.textContent = key;
+        elementsHead.appendChild(th);
+    });
+
+    // Populate Rows
+    data.forEach((item, index) => {
+        const tr = document.createElement('tr');
+
+        // Add Serial Number
+        tr.appendChild(createCell(index + 1));
+
+        uniqueKeys.forEach(key => {
+            const value = item.elements && item.elements[key] ? item.elements[key] : "N/A";
+            tr.appendChild(createCell(value));
+        });
+
+        elementsBody.appendChild(tr);
+    });
+}
+
+        function createCell(content) {
+            const td = document.createElement('td');
+            td.textContent = content || "N/A";
+            return td;
+        }
+
+        function formatObject(obj) {
+            if (!obj || Object.keys(obj).length === 0) return "N/A";
+            return Object.entries(obj).map(([key, value]) => `${key}: ${value}`).join(", ");
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return "N/A";
+            const date = new Date(dateStr);
+            return date.toLocaleString();
+        }
+
+        loadClients();
     </script>
+
 </body>
 </html>

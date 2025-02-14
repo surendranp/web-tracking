@@ -340,6 +340,33 @@ async function sendDailyTrackingDataToAllClients() {
   }
 }
 
+app.get('/api/clients', async (req, res) => {
+  try {
+    const clients = await Registration.find({}, 'domain'); // Fetch all registered clients (only domain names)
+    res.status(200).json(clients);
+  } catch (error) {
+    console.error('Error fetching clients:', error);
+    res.status(500).send('Internal Server Error');
+  }
+});
+app.get('/api/client-data/:domain', async (req, res) => {
+  const { domain } = req.params;
+  try {
+    const collectionName = sanitizeDomain(domain);
+    let Tracking = mongoose.models[collectionName];
+
+    if (!Tracking) {
+      Tracking = mongoose.model(collectionName, TrackingSchema, collectionName);
+    }
+
+    const trackingData = await Tracking.find({}).lean(); // Fetch all tracking data
+    res.status(200).json(trackingData);
+  } catch (error) {
+    console.error(`Error fetching data for ${domain}:`, error);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
 // Schedule daily email at 9 AM Indian Time
 cron.schedule('0 3 * * *', async () => {
   console.log('Sending daily tracking data...');
@@ -362,5 +389,5 @@ app.get('/tracking.js', (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+  console.log(`Server is running on port http://localhost:${port}`);
 });
