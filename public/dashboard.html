@@ -101,6 +101,18 @@
             </table>
         </div>
 
+        <!-- Table 3: Pageviews Data -->
+<div class="table-container">
+    <h3>Pageviews Data</h3>
+    <table id="pageviewsTable">
+        <thead>
+            <tr id="pageviewsHead"></tr>
+        </thead>
+        <tbody id="pageviewsBody"></tbody>
+    </table>
+</div>
+
+
     </div>
 
     <script>
@@ -125,59 +137,62 @@
         }
 
         async function loadClientData(domain) {
-            const response = await fetch(`/api/client-data/${domain}`);
-            const data = await response.json();
+    const response = await fetch(`/api/client-data/${domain}`);
+    const data = await response.json();
 
-            if (data.length === 0) {
-                document.getElementById('clientTable').style.display = "none";
-                document.getElementById('elementsTable').style.display = "none";
-                return;
-            }
+    if (data.length === 0) {
+        document.getElementById('clientTable').style.display = "none";
+        document.getElementById('elementsTable').style.display = "none";
+        document.getElementById('pageviewsTable').style.display = "none";
+        return;
+    }
 
-            document.getElementById('clientTable').style.display = "table";
-            document.getElementById('elementsTable').style.display = "table";
+    document.getElementById('clientTable').style.display = "table";
+    document.getElementById('elementsTable').style.display = "table";
+    document.getElementById('pageviewsTable').style.display = "table";
 
-            // Populate Tracking Data Table
-            populateTrackingTable(data);
+    // Populate Tables
+    populateTrackingTable(data);
+    populateElementsTable(data);
+    populatePageviewsTable(data);
+}
 
-            // Populate Elements Table
-            populateElementsTable(data);
-        }
 
-        function populateTrackingTable(data) {
-            const tableHead = document.getElementById('tableHead');
-            tableHead.innerHTML = '';
-            const tableBody = document.getElementById('tableBody');
-            tableBody.innerHTML = '';
+function populateTrackingTable(data) {
+    const tableHead = document.getElementById('tableHead');
+    tableHead.innerHTML = '';
+    const tableBody = document.getElementById('tableBody');
+    tableBody.innerHTML = '';
 
-            // Table Headers with S.No Column
-            const headers = ["S.No", "URL", "Type", "IP", "Session ID", "Buttons", "Links", "Pageviews", "Session Start", "Session End", "Country", "City"];
-            headers.forEach(header => {
-                const th = document.createElement('th');
-                th.textContent = header;
-                tableHead.appendChild(th);
-            });
+    // Table Headers with S.No Column
+    const headers = ["S.No", "URL", "Type", "IP", "Session ID", "Buttons", "Links", "Pageviews", "Session Start", "Session End", "Country", "City"];
+    headers.forEach(header => {
+        const th = document.createElement('th');
+        th.textContent = header;
+        tableHead.appendChild(th);
+    });
 
-            // Populate Rows
-            data.forEach((item, index) => {
-                const tr = document.createElement('tr');
+    // Populate Rows
+    data.forEach((item, index) => {
+        const tr = document.createElement('tr');
 
-                tr.appendChild(createCell(index + 1));
-                tr.appendChild(createCell(item.url));
-                tr.appendChild(createCell(item.type));
-                tr.appendChild(createCell(item.ip));
-                tr.appendChild(createCell(item.sessionId));
-                tr.appendChild(createCell(formatObject(item.buttons)));
-                tr.appendChild(createCell(formatObject(item.links)));
-                tr.appendChild(createCell(item.pageviews ? item.pageviews.join(", ") : "N/A"));
-                tr.appendChild(createCell(formatDate(item.sessionStart)));
-                tr.appendChild(createCell(formatDate(item.sessionEnd)));
-                tr.appendChild(createCell(item.country || "Unknown"));
-                tr.appendChild(createCell(item.city || "Unknown"));
+        tr.appendChild(createCell(index + 1)); // Serial Number
+        tr.appendChild(createCell(item.url));
+        tr.appendChild(createCell(item.type));
+        tr.appendChild(createCell(item.ip));
+        tr.appendChild(createCell(item.sessionId));
+        tr.appendChild(createCell(formatObject(item.buttons)));
+        tr.appendChild(createCell(formatObject(item.links)));
+        tr.appendChild(createCell(item.pageviews ? item.pageviews.join(", ") : "N/A"));
+        tr.appendChild(createCell(formatDate(item.sessionStart)));
+        tr.appendChild(createCell(formatDate(item.sessionEnd)));
+        tr.appendChild(createCell(item.country || "Unknown"));
+        tr.appendChild(createCell(item.city || "Unknown"));
 
-                tableBody.appendChild(tr);
-            });
-        }
+        tableBody.appendChild(tr);
+    });
+}
+
 
         function populateElementsTable(data) {
     const elementsHead = document.getElementById('elementsHead');
@@ -217,6 +232,43 @@
         });
 
         elementsBody.appendChild(tr);
+    });
+}
+function populatePageviewsTable(data) {
+    const pageviewsHead = document.getElementById('pageviewsHead');
+    pageviewsHead.innerHTML = '';
+    const pageviewsBody = document.getElementById('pageviewsBody');
+    pageviewsBody.innerHTML = '';
+
+    // Create Header Row
+    const serialTh = document.createElement('th');
+    serialTh.textContent = "S.No"; 
+    pageviewsHead.appendChild(serialTh);
+
+    const pageviewTh = document.createElement('th');
+    pageviewTh.textContent = "Pageviews";
+    pageviewsHead.appendChild(pageviewTh);
+
+    // Populate Rows
+    data.forEach((item, index) => {
+        if (item.pageviews && item.pageviews.length > 0) {
+            item.pageviews.forEach((pageview, subIndex) => {
+                const tr = document.createElement('tr');
+
+                // Serial Number
+                tr.appendChild(createCell(`${index + 1}.${subIndex + 1}`));
+
+                // Pageview URL
+                tr.appendChild(createCell(pageview));
+
+                pageviewsBody.appendChild(tr);
+            });
+        } else {
+            const tr = document.createElement('tr');
+            tr.appendChild(createCell(index + 1));
+            tr.appendChild(createCell("No Pageviews Recorded"));
+            pageviewsBody.appendChild(tr);
+        }
     });
 }
 
