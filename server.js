@@ -1,3 +1,4 @@
+// server.js
 const express = require('express');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
@@ -8,14 +9,27 @@ const cron = require('node-cron');
 const fs = require('fs');
 const { Parser } = require('json2csv');
 const axios = require('axios');
+const session = require('express-session');
+const bcrypt = require('bcrypt');
 require('dotenv').config();
 
 const app = express();
 const port = process.env.PORT || 8080;
 
+// Middlewares
 app.use(cors());
 app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
+// Session configuration
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'some-secret-key',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: false } // Change to true in production with HTTPS
+}));
+
+// Connect to MongoDB
 const mongoUri = process.env.MONGODB_URI;
 mongoose.connect(mongoUri)
   .then(() => console.log('MongoDB connected'))
@@ -24,6 +38,11 @@ mongoose.connect(mongoUri)
     process.exit(1);
   });
 
+/** 
+ * ---------------
+ * Domain Tracking & Registration Code (Existing)
+ * ---------------
+ */
 function sanitizeDomain(domain) {
   return domain.replace(/[.\$\/:]/g, '_');
 }
@@ -46,16 +65,16 @@ const TrackingSchema = new mongoose.Schema({
   links: { type: Map, of: Number, default: {} },
   elements: { type: Map, of: Number, default: {} },
   pageviews: [String],
-  sessionStart: { type: Date, default: Date.now },  // Session start time
-  sessionEnd: { type: Date },  // Session end time
-  country: String,  // Added country
-  city: String,      // Added city
-  adBlockerActive: { type: Boolean, default: false }  // New field for ad blocker status
+  sessionStart: { type: Date, default: Date.now },
+  sessionEnd: { type: Date },
+  country: String,
+  city: String,
+  adBlockerActive: { type: Boolean, default: false }
 });
 
 const Tracking = mongoose.models.Tracking || mongoose.model('Tracking', TrackingSchema);
 
-// Register endpoint
+// Domain Registration endpoint
 app.post('/api/register', async (req, res) => {
   const { domain, email } = req.body;
   try {
@@ -80,10 +99,8 @@ app.post('/api/register', async (req, res) => {
 // Tracking endpoint
 app.post('/api/pageviews', async (req, res) => {
   const { domain, url, type, sessionId, buttonName, linkName, elementName, elementTag, adBlockerActive } = req.body;
-
-  // Handle IPs behind proxies
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-  const cleanedIp = ip.split(',')[0].trim(); // In case multiple IPs are returned
+  const cleanedIp = ip.split(',')[0].trim();
 
   if (!domain || !url || !cleanedIp || !sessionId) {
     return res.status(400).send('Domain, URL, IP, and Session ID are required.');
@@ -97,7 +114,7 @@ app.post('/api/pageviews', async (req, res) => {
       Tracking = mongoose.model(collectionName, TrackingSchema, collectionName);
     }
 
-    // Fetch geolocation data using ipapi or any other IP-based service
+    // Fetch geolocation data
     const geoLocationUrl = `https://ipapi.co/${cleanedIp}/json/`;
     let geoLocationData = { country: 'Unknown', city: 'Unknown' };
 
@@ -117,7 +134,6 @@ app.post('/api/pageviews', async (req, res) => {
     let existingTrackingData = await Tracking.findOne({ ip: cleanedIp, sessionId });
 
     if (existingTrackingData) {
-      // Merge the new data with the existing data
       if (type === 'pageview') {
         if (!existingTrackingData.pageviews.includes(url)) {
           existingTrackingData.pageviews.push(url);
@@ -128,20 +144,15 @@ app.post('/api/pageviews', async (req, res) => {
       } else if (type === 'link_click') {
         const sanitizedLinkName = linkName ? linkName.replace(/[.\$]/g, '_') : 'Unnamed Link';
         existingTrackingData.links.set(sanitizedLinkName, (existingTrackingData.links.get(sanitizedLinkName) || 0) + 1);
-      } 
-      // 🔴 NEW: Track clicks on any element (div, img, span, etc.)
-      else if (type === 'element_click') {
+      } else if (type === 'element_click') {
         const sanitizedElementName = elementName ? elementName.replace(/[.\$]/g, '_') : elementTag || 'Unnamed Element';
         existingTrackingData.elements.set(sanitizedElementName, (existingTrackingData.elements.get(sanitizedElementName) || 0) + 1);
       }
 
-      existingTrackingData.sessionEnd = new Date();  // Update session end time
-      existingTrackingData.adBlockerActive = adBlockerActive;  // Update ad blocker status
-
-      // Save the merged data
+      existingTrackingData.sessionEnd = new Date();
+      existingTrackingData.adBlockerActive = adBlockerActive;
       await existingTrackingData.save();
     } else {
-      // Create a new tracking document if no existing one found
       const newTrackingData = new Tracking({
         url,
         type,
@@ -150,13 +161,12 @@ app.post('/api/pageviews', async (req, res) => {
         pageviews: type === 'pageview' ? [url] : [],
         buttons: type === 'button_click' ? { [buttonName]: 1 } : {},
         links: type === 'link_click' ? { [linkName]: 1 } : {},
-        elements: type === 'element_click' ? { [elementName]: 1 } : {}, // 🔴 NEW: Store element click
-        sessionStart: new Date(),  // Start a new session
+        elements: type === 'element_click' ? { [elementName]: 1 } : {},
+        sessionStart: new Date(),
         country: geoLocationData.country,
         city: geoLocationData.city,
-        adBlockerActive  // Save ad blocker status
+        adBlockerActive
       });
-
       await newTrackingData.save();
     }
 
@@ -167,6 +177,99 @@ app.post('/api/pageviews', async (req, res) => {
   }
 });
 
+/** 
+ * ---------------
+ * User Authentication Code (New)
+ * ---------------
+ */
+
+// Create User schema & model
+const UserSchema = new mongoose.Schema({
+  username: { type: String, required: true, unique: true },
+  email:    { type: String, required: true, unique: true },
+  password: { type: String, required: true }
+});
+const User = mongoose.models.User || mongoose.model('User', UserSchema);
+
+// GET register page
+app.get('/auth/register', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/register.html'));
+});
+
+// POST register (User)
+app.post('/auth/register', async (req, res) => {
+  try {
+    const { username, email, password } = req.body;
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: 'User already exists.' });
+    }
+    // Hash password and save new user
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newUser = new User({ username, email, password: hashedPassword });
+    await newUser.save();
+
+    // Optionally, create session on signup
+    req.session.userId = newUser._id;
+    res.status(201).json({ message: 'User registered successfully.' });
+  } catch (error) {
+    console.error('User Register Error:', error);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+});
+
+// GET login page
+app.get('/auth/login', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/login.html'));
+});
+
+// POST login (User)
+// GET login page (no changes to serving the static file)
+app.get('/auth/login', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/login.html'));
+});
+
+// POST login (User) using username and password
+app.post('/auth/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    // Find user by username instead of email
+    const user = await User.findOne({ username });
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid username or password.' });
+    }
+    // Compare password
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Invalid username or password.' });
+    }
+    // Create session
+    req.session.userId = user._id;
+    res.json({ message: 'Logged in successfully.' });
+  } catch (error) {
+    console.error('User Login Error:', error);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+});
+
+
+// POST logout (User)
+app.post('/auth/logout', (req, res) => {
+  req.session.destroy(err => {
+    if (err) {
+      return res.status(500).json({ message: 'Could not log out, please try again.' });
+    }
+    res.clearCookie('connect.sid');
+    res.json({ message: 'Logged out successfully.' });
+  });
+});
+
+/** 
+ * ---------------
+ * Email & Dashboard Routes (Existing)
+ * ---------------
+ */
 
 // Send tracking data to client via email with CSV attachment
 async function sendTrackingDataToClient(domain, email) {
@@ -198,7 +301,7 @@ async function sendTrackingDataToClient(domain, email) {
       return;
     }
 
-    // Calculate unique users based on IP addresses
+    // Calculate unique users and other metrics
     const uniqueUsers = new Set(trackingData.map(doc => doc.ip));
     const userCount = uniqueUsers.size;
     const adBlockerUsers = trackingData.filter(doc => doc.adBlockerActive).length;
@@ -206,36 +309,29 @@ async function sendTrackingDataToClient(domain, email) {
     let totalPageviews = 0;
     let totalButtonClicks = 0;
     let totalLinkClicks = 0;
-    let totalElementClicks = 0; // 🔴 NEW: Track total element clicks
-    let overallDuration = 0;  // To store the total duration of all users
+    let totalElementClicks = 0;
+    let overallDuration = 0;
 
     trackingData.forEach(doc => {
       totalPageviews += doc.pageviews.length;
-
       const buttonClicks = doc.buttons instanceof Map ? doc.buttons : new Map(Object.entries(doc.buttons));
       totalButtonClicks += [...buttonClicks.values()].reduce((sum, count) => sum + count, 0);
-
       const linkClicks = doc.links instanceof Map ? doc.links : new Map(Object.entries(doc.links));
       totalLinkClicks += [...linkClicks.values()].reduce((sum, count) => sum + count, 0);
-
-      const elementClicks = doc.elements instanceof Map ? doc.elements : new Map(Object.entries(doc.elements)); // 🔴 NEW
-      totalElementClicks += [...elementClicks.values()].reduce((sum, count) => sum + count, 0); // 🔴 NEW
-
-      // Calculate the session duration (if sessionEnd is null, use current time)
+      const elementClicks = doc.elements instanceof Map ? doc.elements : new Map(Object.entries(doc.elements));
+      totalElementClicks += [...elementClicks.values()].reduce((sum, count) => sum + count, 0);
       const sessionDuration = ((doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart);
       overallDuration += sessionDuration;
     });
 
-    // Convert overallDuration from milliseconds to hours, minutes, and seconds
     const totalDurationInSeconds = Math.floor(overallDuration / 1000);
     const hours = Math.floor(totalDurationInSeconds / 3600);
     const minutes = Math.floor((totalDurationInSeconds % 3600) / 60);
     const seconds = totalDurationInSeconds % 60;
 
-    // Prepare data for CSV
     const csvFields = [
       'URL', 'Timestamp', 'Pageviews', 
-      'Buttons Clicked', 'Links Clicked', 'Elements Clicked', // 🔴 NEW: Elements Clicked
+      'Buttons Clicked', 'Links Clicked', 'Elements Clicked',
       'Session Duration (seconds)', 'Session Duration (H:M:S)', 
       'Country', 'City'
     ];
@@ -243,14 +339,12 @@ async function sendTrackingDataToClient(domain, email) {
     const csvData = trackingData.map(doc => {
       const buttonClicks = doc.buttons instanceof Map ? doc.buttons : new Map(Object.entries(doc.buttons));
       const linkClicks = doc.links instanceof Map ? doc.links : new Map(Object.entries(doc.links));
-      const elementClicks = doc.elements instanceof Map ? doc.elements : new Map(Object.entries(doc.elements)); // 🔴 NEW
-
-      // Calculate the session duration
+      const elementClicks = doc.elements instanceof Map ? doc.elements : new Map(Object.entries(doc.elements));
       const sessionDurationMs = (doc.sessionEnd ? doc.sessionEnd : new Date()) - doc.sessionStart;
       const sessionDurationInSeconds = Math.floor(sessionDurationMs / 1000);
-      const hours = Math.floor(sessionDurationInSeconds / 3600);
-      const minutes = Math.floor((sessionDurationInSeconds % 3600) / 60);
-      const seconds = sessionDurationInSeconds % 60;
+      const hrs = Math.floor(sessionDurationInSeconds / 3600);
+      const mins = Math.floor((sessionDurationInSeconds % 3600) / 60);
+      const secs = sessionDurationInSeconds % 60;
     
       return {
         URL: doc.url,
@@ -258,15 +352,14 @@ async function sendTrackingDataToClient(domain, email) {
         Pageviews: doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews',
         'Buttons Clicked': Object.keys(Object.fromEntries(buttonClicks)).length ? JSON.stringify(Object.fromEntries(buttonClicks)) : 'No button clicks',
         'Links Clicked': Object.keys(Object.fromEntries(linkClicks)).length ? JSON.stringify(Object.fromEntries(linkClicks)) : 'No link clicks',
-        'Elements Clicked': Object.keys(Object.fromEntries(elementClicks)).length ? JSON.stringify(Object.fromEntries(elementClicks)) : 'No element clicks', // 🔴 NEW
+        'Elements Clicked': Object.keys(Object.fromEntries(elementClicks)).length ? JSON.stringify(Object.fromEntries(elementClicks)) : 'No element clicks',
         'Session Duration (seconds)': sessionDurationInSeconds,
-        'Session Duration (H:M:S)': `${hours}h ${minutes}m ${seconds}s`,  // Formatted session duration
+        'Session Duration (H:M:S)': `${hrs}h ${mins}m ${secs}s`,
         Country: doc.country || 'Unknown',
         City: doc.city || 'Unknown'
       };
     });
 
-    // Add the overall total duration (for all users) to the CSV
     csvData.push({
       URL: 'Total Duration for All Users',
       Timestamp: '',
@@ -277,38 +370,33 @@ async function sendTrackingDataToClient(domain, email) {
       'Session Duration (seconds)': `${hours} hours, ${minutes} minutes, ${seconds} seconds`
     });
 
-    // Convert JSON data to CSV
     const json2csvParser = new Parser({ fields: csvFields });
     const csv = json2csvParser.parse(csvData);
 
-    // Write CSV to a file (temporary file location)
     const filePath = `./daily_tracking_${domain}.csv`;
     fs.writeFileSync(filePath, csv);
 
-    // Email content
     let dataText = `Tracking data for ${domain} (Last 24 Hours):\n\n`;
     dataText += `Total Unique Users: ${userCount}\n`;
     dataText += `Total Ad Blocker Users: ${adBlockerUsers}\n`;
     dataText += `Total Pageviews: ${totalPageviews}\n`;
     dataText += `Total Button Clicks: ${totalButtonClicks}\n`;
     dataText += `Total Link Clicks: ${totalLinkClicks}\n`;
-    dataText += `Total Element Clicks: ${totalElementClicks}\n`; // 🔴 NEW
+    dataText += `Total Element Clicks: ${totalElementClicks}\n`;
     dataText += `Overall Duration for All Users: ${hours} hours, ${minutes} minutes, and ${seconds} seconds\n\n`;
 
     trackingData.forEach(doc => {
       const buttonClicks = doc.buttons instanceof Map ? doc.buttons : new Map(Object.entries(doc.buttons));
       const linksObject = doc.links instanceof Map ? doc.links : new Map(Object.entries(doc.links));
-      const elementsObject = doc.elements instanceof Map ? doc.elements : new Map(Object.entries(doc.elements)); // 🔴 NEW
-
+      const elementsObject = doc.elements instanceof Map ? doc.elements : new Map(Object.entries(doc.elements));
       dataText += `URL: ${doc.url}\n`;
       dataText += `Timestamp: ${new Date(doc.timestamp).toLocaleString()}\n`;
       dataText += `Pageviews: ${doc.pageviews.length ? doc.pageviews.join(', ') : 'No pageviews'}\n`;
       dataText += `Buttons Clicked: ${Object.keys(Object.fromEntries(buttonClicks)).length ? JSON.stringify(Object.fromEntries(buttonClicks)) : 'No button clicks'}\n`;
       dataText += `Links Clicked: ${Object.keys(Object.fromEntries(linksObject)).length ? JSON.stringify(Object.fromEntries(linksObject)) : 'No link clicks'}\n`;
-      dataText += `Elements Clicked: ${Object.keys(Object.fromEntries(elementsObject)).length ? JSON.stringify(Object.fromEntries(elementsObject)) : 'No element clicks'}\n\n`; // 🔴 NEW
+      dataText += `Elements Clicked: ${Object.keys(Object.fromEntries(elementsObject)).length ? JSON.stringify(Object.fromEntries(elementsObject)) : 'No element clicks'}\n\n`;
     });
 
-    // Email options with attachment
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
@@ -317,11 +405,8 @@ async function sendTrackingDataToClient(domain, email) {
       attachments: [{ filename: `daily_tracking_${domain}.csv`, path: filePath }]
     };
 
-    // Send email
     await transporter.sendMail(mailOptions);
     console.log(`Daily tracking data with CSV attachment sent to ${email}`);
-
-    // Clean up the CSV file after sending the email
     fs.unlinkSync(filePath);
   } catch (error) {
     console.error('Error sending email:', error);
@@ -342,7 +427,7 @@ async function sendDailyTrackingDataToAllClients() {
 
 app.get('/api/clients', async (req, res) => {
   try {
-    const clients = await Registration.find({}, 'domain'); // Fetch all registered clients (only domain names)
+    const clients = await Registration.find({}, 'domain');
     res.status(200).json(clients);
   } catch (error) {
     console.error('Error fetching clients:', error);
@@ -359,7 +444,7 @@ app.get('/api/client-data/:domain', async (req, res) => {
       Tracking = mongoose.model(collectionName, TrackingSchema, collectionName);
     }
 
-    const trackingData = await Tracking.find({}).lean(); // Fetch all tracking data
+    const trackingData = await Tracking.find({}).lean();
     res.status(200).json(trackingData);
   } catch (error) {
     console.error(`Error fetching data for ${domain}:`, error);
@@ -374,16 +459,14 @@ cron.schedule('0 3 * * *', async () => {
 }, {
   timezone: 'Asia/Kolkata'
 });
-// Serve dashboard page
+
+// Serve dashboard and other pages
 app.get('/dashboard', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/dashboard.html'));
 });
-
-// Serve other pages
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/home.html'));
 });
-
 app.get('/tracking.js', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/tracking.js'));
 });
