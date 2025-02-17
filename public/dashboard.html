@@ -11,131 +11,144 @@
     integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
     crossorigin="anonymous"
   />
-  <!-- <link rel="stylesheet" href="/public/Dashboar.css"> -->
-   <style>
-      /* Global Styles */
-  * {
-    box-sizing: border-box;
-  }
-  body {
-    margin: 0;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: #f0f4f8;
-    min-height: 100vh; /* Allows scrolling if content grows */
-  }
-  /* Navigation Bar Overrides */
-  .navbar-custom {
-    background-color: rgba(0, 0, 0, 0.75);
-  }
-  .navbar-custom .navbar-brand,
-  .navbar-custom .nav-link {
-    color: #fff;
-  }
-  .navbar-custom .nav-link:hover {
-    color: #ddd;
-  }
-  /* Page Container */
-  .page-container {
-    display: flex;
-    height: calc(100vh - 56px); /* Subtract navbar height */
-    overflow: hidden;
-  }
-  /* Sidebar */
-  #sidebar {
-    width: 250px;
-    background: #333;
-    color: #fff;
-    padding: 20px;
-    overflow-y: auto;
-    transition: width 0.3s ease, padding 0.3s ease;
-    min-height: calc(100vh - 56px);
-  }
-  #sidebar.collapsed {
-    width: 0;
-    padding: 0;
-    overflow: hidden;
-  }
-  #sidebar h3 {
-    margin-top: 0;
-    font-size: 1.2rem;
-    margin-bottom: 1rem;
-    text-align: center;
-  }
-  #sidebar ul {
-    list-style: none;
-    padding: 0;
-  }
-  #sidebar li {
-    padding: 10px;
-    margin-bottom: 5px;
-    cursor: pointer;
-    border-bottom: 1px solid #555;
-    transition: background 0.3s, transform 0.3s;
-  }
-  #sidebar li:hover {
-    background: #444;
-    transform: scale(1.02);
-  }
-  #sidebar li.active {
-    background: #007bff;
-    font-weight: bold;
-  }
-  /* Main Content */
-  #mainContent {
-    flex: 1;
-    padding: 20px 40px;
-    transition: all 0.3s ease;
-    animation: fadeIn 1s ease-out;
-    overflow-y: auto;
-    margin: 0 auto;
-    max-width: 1300px;
-  }
-  /* Date Filter Styles */
-  #filterContainer {
-    margin-bottom: 20px;
-    max-width: 250px;
-  }
-  /* Table Container */
-  .table-container {
-    max-height: 500px;
-    overflow-y: auto;
-    border: 1px solid #ccc;
-    margin-bottom: 40px;
-    background: #fff;
-    border-radius: 4px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    animation: fadeInUp 0.8s ease-out;
-  }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 10px;
-  }
-  table, th, td {
-    border: 1px solid #ccc;
-    text-align: left;
-    padding: 8px;
-  }
-  th {
-    background: #f4f4f4;
-    position: sticky;
-    top: 0;
-    z-index: 2;
-  }
-  /* Headings */
-  h2, h3 {
-    color: #333;
-  }
-  /* Animations */
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-  @keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-   </style>
+  <link rel="stylesheet" href="/public/Dashboar.css">
+  <style>
+    /* Global Styles */
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f0f4f8;
+      min-height: 100vh;
+    }
+    /* Navigation Bar Overrides */
+    .navbar-custom {
+      background-color: rgba(0, 0, 0, 0.75);
+    }
+    .navbar-custom .navbar-brand,
+    .navbar-custom .nav-link {
+      color: #fff;
+    }
+    .navbar-custom .nav-link:hover {
+      color: #ddd;
+    }
+    /* Page Container */
+    .page-container {
+      display: flex;
+      height: calc(100vh - 56px);
+      overflow: hidden;
+    }
+    /* Sidebar */
+    #sidebar {
+      width: 250px;
+      background: #333;
+      color: #fff;
+      padding: 20px;
+      overflow-y: auto;
+      transition: width 0.3s ease, padding 0.3s ease;
+      min-height: calc(100vh - 56px);
+    }
+    #sidebar.collapsed {
+      width: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+    #sidebar h3 {
+      margin-top: 0;
+      font-size: 1.2rem;
+      margin-bottom: 1rem;
+      text-align: center;
+    }
+    #sidebar ul {
+      list-style: none;
+      padding: 0;
+    }
+    #sidebar li {
+      padding: 10px;
+      margin-bottom: 5px;
+      cursor: pointer;
+      border-bottom: 1px solid #555;
+      transition: background 0.3s, transform 0.3s;
+    }
+    #sidebar li:hover {
+      background: #444;
+      transform: scale(1.02);
+    }
+    #sidebar li.active {
+      background: #007bff;
+      font-weight: bold;
+    }
+    /* Main Content */
+    #mainContent {
+      flex: 1;
+      padding: 20px 40px;
+      transition: all 0.3s ease;
+      animation: fadeIn 1s ease-out;
+      overflow-y: auto;
+      margin: 0 auto;
+      max-width: 1300px;
+    }
+    /* Filter Container for Date and Column Search */
+    #filterContainer {
+      margin-bottom: 20px;
+      max-width: 250px;
+    }
+    /* Style for Column Search input group */
+    .input-group {
+      display: flex;
+    }
+    .filter-input {
+      flex: 1;
+      padding: 4px;
+      font-size: 0.9rem;
+      border: 1px solid #ddd;
+    }
+    .input-group .btn {
+      border: 1px solid #ddd;
+    }
+    /* Table Container */
+    .table-container {
+      max-height: 500px;
+      overflow-y: auto;
+      border: 1px solid #ccc;
+      margin-bottom: 40px;
+      background: #fff;
+      border-radius: 4px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      animation: fadeInUp 0.8s ease-out;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    table, th, td {
+      border: 1px solid #ccc;
+      text-align: left;
+      padding: 8px;
+    }
+    th {
+      background: #f4f4f4;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+    /* Headings */
+    h2, h3 {
+      color: #333;
+    }
+    /* Animations */
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+  </style>
 </head>
 <body>
   <!-- Sticky Navigation Bar -->
@@ -144,15 +157,8 @@
       <!-- Toggle Sidebar Button in Navbar -->
       <button class="btn btn-secondary me-3" id="toggleSidebarBtn">Toggle Sidebar</button>
       <a class="navbar-brand" href="/">Tracking Service</a>
-      <button
-        class="navbar-toggler"
-        type="button"
-        data-bs-toggle="collapse"
-        data-bs-target="#navbarNav"
-        aria-controls="navbarNav"
-        aria-expanded="false"
-        aria-label="Toggle navigation"
-      >
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+              aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
       </button>
       <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
@@ -168,11 +174,8 @@
           <li class="nav-item">
             <a class="nav-link" href="/auth/login">Login</a>
           </li>
-          <!-- Logout Button as Bootstrap Button -->
           <li class="nav-item">
-            <button class="btn btn-danger nav-link" id="logoutButton" style="border: none;">
-              Logout
-            </button>
+            <button class="btn btn-danger nav-link" id="logoutButton" style="border: none;">Logout</button>
           </li>
         </ul>
       </div>
@@ -189,23 +192,22 @@
 
     <!-- Main Content -->
     <div id="mainContent">
+      <div class="box d-flex justify-content-between">
       <!-- Date Filter -->
       <div id="filterContainer" class="mb-3">
         <label for="filterDate"><strong>Select Date:</strong></label>
         <input type="date" id="filterDate" class="form-control" />
       </div>
 
-      <!-- Column Search -->
-      <div class="mb-3" style="max-width: 250px;">
+      <!-- Column Search with Clear Button -->
+      <div class="mb-3" style="max-width:250px;">
         <label for="columnSearch"><strong>Search Column:</strong></label>
-        <input
-          type="text"
-          id="columnSearch"
-          class="form-control"
-          placeholder="Type partial header e.g. 'ctc', 'phone'"
-        />
+        <div class="input-group">
+          <input type="text" id="columnSearch" class="form-control" placeholder="Type column name" />
+          <button class="btn btn-outline-secondary" id="clearColumnSearch" type="button">Clear</button>
+        </div>
       </div>
-
+    </div>
       <h2>Client Details</h2>
 
       <!-- Table 1: Tracking Data -->
@@ -293,8 +295,8 @@
     async function loadClientData(domain) {
       const response = await fetch(`/api/client-data/${domain}`);
       const data = await response.json();
-      allData = data; // store data globally
-      applyDateFilter(); // apply date filter (if any) when loading new data
+      allData = data;
+      applyDateFilter();
     }
 
     // Apply date filter based on the date input value
@@ -302,13 +304,11 @@
       const filterDate = document.getElementById('filterDate').value;
       let filteredData = allData;
       if (filterDate) {
-        // Filter data by matching the sessionStart date
         filteredData = allData.filter(item => {
           const sessionDate = new Date(item.sessionStart).toISOString().substring(0, 10);
           return sessionDate === filterDate;
         });
       }
-      // Populate tables with filtered data
       if (filteredData.length === 0) {
         document.getElementById('clientTable').style.display = 'none';
         document.getElementById('elementsTable').style.display = 'none';
@@ -321,21 +321,22 @@
       populateTrackingTable(filteredData);
       populateElementsTable(filteredData);
       populatePageviewsTable(filteredData);
-
-      // After repopulating, apply column search
       applyColumnSearch();
     }
 
     // Listen to changes in the date input
     document.getElementById('filterDate').addEventListener('change', applyDateFilter);
 
-    // Column Search - show only columns whose header includes the search text
+    // Column Search: show only columns whose header includes search value
     document.getElementById('columnSearch').addEventListener('input', applyColumnSearch);
+    document.getElementById('clearColumnSearch').addEventListener('click', () => {
+      document.getElementById('columnSearch').value = '';
+      applyColumnSearch();
+    });
 
     function applyColumnSearch() {
       const searchValue = document.getElementById('columnSearch').value.toLowerCase().trim();
-
-      // For each table, we hide columns whose header text doesn't include searchValue
+      // For each table, hide columns whose header doesn't include searchValue
       filterColumns('clientTable', searchValue);
       filterColumns('elementsTable', searchValue);
       filterColumns('pageviewsTable', searchValue);
@@ -343,24 +344,19 @@
 
     function filterColumns(tableId, searchValue) {
       const table = document.getElementById(tableId);
-      if (!table || table.style.display === 'none') return; // skip if table is hidden
-
+      if (!table || table.style.display === 'none') return;
       const thead = table.querySelector('thead');
       const tbody = table.querySelector('tbody');
       if (!thead || !tbody) return;
 
-      // Grab all <th> from the first row
+      // Grab all header cells from the first row
       const headerCells = thead.querySelectorAll('tr:first-child th');
       headerCells.forEach((th, colIndex) => {
         const headerText = th.textContent.toLowerCase();
-        // If there's no search value, show all columns
-        // Otherwise, show only if the header includes the searchValue
         const showColumn = !searchValue || headerText.includes(searchValue);
-
-        // For thead
         th.style.display = showColumn ? '' : 'none';
 
-        // For each row in tbody, hide or show the corresponding cell
+        // Hide/show corresponding cells in tbody rows
         const rows = tbody.querySelectorAll('tr');
         rows.forEach(row => {
           const cell = row.cells[colIndex];
@@ -501,6 +497,57 @@
     loadClients();
   </script>
   <!-- Bootstrap JS Bundle -->
+   <!-- <script>
+  // Column Search - show only columns whose header includes the search text
+  document.getElementById('columnSearch').addEventListener('input', applyColumnSearch);
+
+  function applyColumnSearch() {
+    const searchValue = document.getElementById('columnSearch').value.toLowerCase().trim();
+    // For each table, hide columns based on header text (except Serial Number)
+    filterColumns('clientTable', searchValue);
+    filterColumns('elementsTable', searchValue);
+    filterColumns('pageviewsTable', searchValue);
+  }
+
+  function filterColumns(tableId, searchValue) {
+    const table = document.getElementById(tableId);
+    if (!table || table.style.display === 'none') return; // skip if table is hidden
+
+    const thead = table.querySelector('thead');
+    const tbody = table.querySelector('tbody');
+    if (!thead || !tbody) return;
+
+    // Grab all <th> from the first row
+    const headerCells = thead.querySelectorAll('tr:first-child th');
+    headerCells.forEach((th, colIndex) => {
+      // Always show the Serial Number column (assumed to be first column)
+      if (colIndex === 0) {
+        th.style.display = '';
+        const rows = tbody.querySelectorAll('tr');
+        rows.forEach(row => {
+          if (row.cells[0]) {
+            row.cells[0].style.display = '';
+          }
+        });
+        return;
+      }
+
+      const headerText = th.textContent.toLowerCase();
+      // Show column if searchValue is empty or header contains the searchValue
+      const showColumn = !searchValue || headerText.includes(searchValue);
+      th.style.display = showColumn ? '' : 'none';
+
+      // Hide/show corresponding cells in each row
+      const rows = tbody.querySelectorAll('tr');
+      rows.forEach(row => {
+        const cell = row.cells[colIndex];
+        if (cell) {
+          cell.style.display = showColumn ? '' : 'none';
+        }
+      });
+    });
+  }
+</script> -->
   <script
     src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
     integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
