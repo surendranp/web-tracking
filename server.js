@@ -10,7 +10,7 @@ const fs = require('fs');
 const { Parser } = require('json2csv');
 const axios = require('axios');
 const session = require('express-session');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
 const app = express();
