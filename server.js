@@ -54,7 +54,7 @@ const RegistrationSchema = new mongoose.Schema({
 
 const Registration = mongoose.models.Registration || mongoose.model('Registration', RegistrationSchema);
 
-// Updated TrackingSchema with country and city
+// Updated TrackingSchema with additional fields
 const TrackingSchema = new mongoose.Schema({
   url: String,
   type: String,
@@ -108,10 +108,10 @@ app.post('/api/pageviews', async (req, res) => {
 
   try {
     const collectionName = sanitizeDomain(domain);
-    let Tracking = mongoose.models[collectionName];
+    let TrackingModel = mongoose.models[collectionName];
 
-    if (!Tracking) {
-      Tracking = mongoose.model(collectionName, TrackingSchema, collectionName);
+    if (!TrackingModel) {
+      TrackingModel = mongoose.model(collectionName, TrackingSchema, collectionName);
     }
 
     // Fetch geolocation data
@@ -130,10 +130,24 @@ app.post('/api/pageviews', async (req, res) => {
       console.error('Error fetching geolocation data:', geoError.message);
     }
 
-    // Check if a document with the same IP and sessionId exists
-    let existingTrackingData = await Tracking.findOne({ ip: cleanedIp, sessionId });
+    // Handle the 'session_end' event separately.
+    if (type === 'session_end') {
+      const existingTrackingData = await TrackingModel.findOne({ ip: cleanedIp, sessionId });
+      if (existingTrackingData) {
+        existingTrackingData.sessionEnd = new Date();
+        await existingTrackingData.save();
+        return res.status(200).send('Session end recorded.');
+      } else {
+        // Optionally, you can choose to create a new record or simply return an error.
+        return res.status(404).send('Session not found for session_end.');
+      }
+    }
+
+    // For other types, check if a tracking record already exists for the IP and sessionId
+    let existingTrackingData = await TrackingModel.findOne({ ip: cleanedIp, sessionId });
 
     if (existingTrackingData) {
+      // Update the existing record based on event type
       if (type === 'pageview') {
         if (!existingTrackingData.pageviews.includes(url)) {
           existingTrackingData.pageviews.push(url);
@@ -148,12 +162,13 @@ app.post('/api/pageviews', async (req, res) => {
         const sanitizedElementName = elementName ? elementName.replace(/[.\$]/g, '_') : elementTag || 'Unnamed Element';
         existingTrackingData.elements.set(sanitizedElementName, (existingTrackingData.elements.get(sanitizedElementName) || 0) + 1);
       }
-
+      // Optionally update the sessionEnd on every event (to reflect last activity)
       existingTrackingData.sessionEnd = new Date();
       existingTrackingData.adBlockerActive = adBlockerActive;
       await existingTrackingData.save();
     } else {
-      const newTrackingData = new Tracking({
+      // Create a new tracking record for a new session
+      const newTrackingData = new TrackingModel({
         url,
         type,
         ip: cleanedIp,
@@ -163,6 +178,7 @@ app.post('/api/pageviews', async (req, res) => {
         links: type === 'link_click' ? { [linkName]: 1 } : {},
         elements: type === 'element_click' ? { [elementName]: 1 } : {},
         sessionStart: new Date(),
+        // sessionEnd will be updated later either on events or via a session_end call
         country: geoLocationData.country,
         city: geoLocationData.city,
         adBlockerActive
@@ -225,16 +241,10 @@ app.get('/auth/login', (req, res) => {
 });
 
 // POST login (User)
-// GET login page (no changes to serving the static file)
-app.get('/auth/login', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/login.html'));
-});
-
-// POST login (User) using username and password
 app.post('/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body;
-    // Find user by username instead of email
+    // Find user by username
     const user = await User.findOne({ username });
     if (!user) {
       return res.status(400).json({ message: 'Invalid username or password.' });
@@ -252,7 +262,6 @@ app.post('/auth/login', async (req, res) => {
     res.status(500).json({ message: 'Internal server error.' });
   }
 });
-
 
 // POST logout (User)
 app.post('/auth/logout', (req, res) => {
@@ -274,10 +283,10 @@ app.post('/auth/logout', (req, res) => {
 // Send tracking data to client via email with CSV attachment
 async function sendTrackingDataToClient(domain, email) {
   const collectionName = sanitizeDomain(domain);
-  let Tracking = mongoose.models[collectionName];
+  let TrackingModel = mongoose.models[collectionName];
 
-  if (!Tracking) {
-    Tracking = mongoose.model(collectionName, TrackingSchema, collectionName);
+  if (!TrackingModel) {
+    TrackingModel = mongoose.model(collectionName, TrackingSchema, collectionName);
   }
 
   const transporter = nodemailer.createTransport({
@@ -292,7 +301,7 @@ async function sendTrackingDataToClient(domain, email) {
     const oneDayAgo = new Date();
     oneDayAgo.setDate(oneDayAgo.getDate() - 1);
 
-    const trackingData = await Tracking.find({
+    const trackingData = await TrackingModel.find({
       timestamp: { $gte: oneDayAgo }
     }).lean();
 
@@ -301,7 +310,7 @@ async function sendTrackingDataToClient(domain, email) {
       return;
     }
 
-    // Calculate unique users and other metrics
+    // Calculate metrics
     const uniqueUsers = new Set(trackingData.map(doc => doc.ip));
     const userCount = uniqueUsers.size;
     const adBlockerUsers = trackingData.filter(doc => doc.adBlockerActive).length;
@@ -438,13 +447,13 @@ app.get('/api/client-data/:domain', async (req, res) => {
   const { domain } = req.params;
   try {
     const collectionName = sanitizeDomain(domain);
-    let Tracking = mongoose.models[collectionName];
+    let TrackingModel = mongoose.models[collectionName];
 
-    if (!Tracking) {
-      Tracking = mongoose.model(collectionName, TrackingSchema, collectionName);
+    if (!TrackingModel) {
+      TrackingModel = mongoose.model(collectionName, TrackingSchema, collectionName);
     }
 
-    const trackingData = await Tracking.find({}).lean();
+    const trackingData = await TrackingModel.find({}).lean();
     res.status(200).json(trackingData);
   } catch (error) {
     console.error(`Error fetching data for ${domain}:`, error);

@@ -15,7 +15,7 @@
 
   // Function to get geolocation data
   function getGeolocation() {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (position) => {
@@ -68,11 +68,17 @@
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ ...data, ip, domain, ...geolocation, adBlockerActive })  // Include geolocation data
+      body: JSON.stringify({ 
+        ...data, 
+        ip, 
+        domain, 
+        ...geolocation, 
+        adBlockerActive 
+      })
     }).catch(error => console.error('Error sending tracking data:', error.message));
   }
 
-  // Retrieve or generate a session ID
+  // Retrieve or generate a session ID and persist it in localStorage
   let sessionId = localStorage.getItem('sessionId') || generateSessionId();
   localStorage.setItem('sessionId', sessionId);
 
@@ -86,10 +92,55 @@
     });
   }
 
-  trackPageView(); // Initial page view tracking
+  // Immediately record the first pageview
+  trackPageView();
 
-  // Track click events
+  // ---- Inactivity Timeout Logic ----
+  // Set an inactivity limit (e.g., 2 minutes)
+  let inactivityTimeout;
+  const INACTIVITY_LIMIT = 2 * 60 * 1000; // 2 minutes
+
+  function resetInactivityTimeout() {
+    if (inactivityTimeout) clearTimeout(inactivityTimeout);
+    inactivityTimeout = setTimeout(() => {
+      // When inactivity is detected, send a session_end event.
+      sendSessionEnd();
+    }, INACTIVITY_LIMIT);
+  }
+
+  // Function to send session end data
+  function sendSessionEnd() {
+    // Send the session end event with sendBeacon for reliability during unload.
+    const payload = JSON.stringify({
+      type: 'session_end',
+      url: window.location.href,
+      timestamp: new Date().toISOString(),
+      sessionId
+    });
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(trackingUrl, payload);
+    } else {
+      // Fallback if sendBeacon is not available.
+      fetch(trackingUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: payload
+      });
+    }
+  }
+
+  // Reset the inactivity timer on user interactions
+  ['click', 'mousemove', 'keydown'].forEach(event => {
+    document.addEventListener(event, resetInactivityTimeout);
+  });
+  // Start the inactivity timer initially
+  resetInactivityTimeout();
+
+  // ---- Click and Element Tracking ----
   document.addEventListener('click', function(event) {
+    // Identify the element clicked.
     let elementName = 'Unnamed Element';
 
     if (event.target.tagName === 'BUTTON') {
@@ -112,14 +163,12 @@
       });
     }
 
-    // 🔴 NEW: Track clicks on any element and capture its name, ID, or class 🔴
+    // For any element clicked, capture additional details.
     let element = event.target;
     let fullElementName = element.innerText.trim() || element.id || element.className || element.tagName;
-    
     if (fullElementName.length > 100) {
-      fullElementName = fullElementName.substring(0, 100) + '...'; // Prevent long text overflow
+      fullElementName = fullElementName.substring(0, 100) + '...'; // Limit text length
     }
-
     sendTrackingData({
       type: 'element_click',
       elementTag: element.tagName.toLowerCase(),
@@ -130,7 +179,7 @@
     });
   });
 
-  // 🔴 NEW: Track when a <div class="track"> appears dynamically 🔴
+  // ---- Mutation Observer for Dynamic Elements ----
   const observer = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
       mutation.addedNodes.forEach((node) => {
@@ -146,11 +195,15 @@
       });
     });
   });
-
-  // Start observing the document for added elements
   observer.observe(document.body, { childList: true, subtree: true });
 
-  // Track page navigation (i.e., navigation path)
+  // Track navigation events (e.g., back/forward buttons or hash changes)
   window.addEventListener('popstate', trackPageView);
-  window.addEventListener('hashchange', trackPageView); // For hash-based routing
+  window.addEventListener('hashchange', trackPageView);
+
+  // ---- Final Session End on Page Unload ----
+  window.addEventListener('beforeunload', function() {
+    sendSessionEnd();
+  });
+
 })();
