@@ -194,10 +194,15 @@
     <div id="mainContent">
       <div class="box d-flex justify-content-between">
       <!-- Date Filter -->
-      <div id="filterContainer" class="mb-3">
-        <label for="filterDate"><strong>Select Date:</strong></label>
-        <input type="date" id="filterDate" class="form-control" />
-      </div>
+    <!-- Updated Date Filters -->
+<div id="filterContainer" class="mb-3">
+  <label for="fromDate"><strong>From:</strong></label>
+  <input type="date" id="fromDate" class="form-control mb-2"/>
+
+  <label for="toDate"><strong>To:</strong></label>
+  <input type="date" id="toDate" class="form-control"/>
+</div>
+
 
       <!-- Column Search with Clear Button -->
       <div class="mb-3" style="max-width:250px;">
@@ -301,31 +306,67 @@
 
     // Apply date filter based on the date input value
     function applyDateFilter() {
-      const filterDate = document.getElementById('filterDate').value;
-      let filteredData = allData;
-      if (filterDate) {
-        filteredData = allData.filter(item => {
-          const sessionDate = new Date(item.sessionStart).toISOString().substring(0, 10);
-          return sessionDate === filterDate;
-        });
-      }
-      if (filteredData.length === 0) {
-        document.getElementById('clientTable').style.display = 'none';
-        document.getElementById('elementsTable').style.display = 'none';
-        document.getElementById('pageviewsTable').style.display = 'none';
-      } else {
-        document.getElementById('clientTable').style.display = 'table';
-        document.getElementById('elementsTable').style.display = 'table';
-        document.getElementById('pageviewsTable').style.display = 'table';
-      }
-      populateTrackingTable(filteredData);
-      populateElementsTable(filteredData);
-      populatePageviewsTable(filteredData);
-      applyColumnSearch();
-    }
+  const fromDateValue = document.getElementById('fromDate').value;
+  const toDateValue = document.getElementById('toDate').value;
 
-    // Listen to changes in the date input
-    document.getElementById('filterDate').addEventListener('change', applyDateFilter);
+  let filteredData = allData;
+
+  if (fromDateValue && toDateValue) {
+    // Convert to Date objects
+    const fromDate = new Date(fromDateValue);
+    const toDate = new Date(toDateValue);
+
+    // Adjust `toDate` to include the full day (23:59:59)
+    toDate.setHours(23, 59, 59, 999);
+
+    filteredData = allData.filter(item => {
+      const sessionDate = new Date(item.sessionStart);
+      return sessionDate >= fromDate && sessionDate <= toDate;
+    });
+
+  } else if (fromDateValue) {
+    // If only 'fromDate' is selected, filter for that specific day
+    const fromDate = new Date(fromDateValue);
+    const fromDateEnd = new Date(fromDate);
+    fromDateEnd.setHours(23, 59, 59, 999);
+
+    filteredData = allData.filter(item => {
+      const sessionDate = new Date(item.sessionStart);
+      return sessionDate >= fromDate && sessionDate <= fromDateEnd;
+    });
+
+  } else if (toDateValue) {
+    // If only 'toDate' is selected, filter for that specific day
+    const toDate = new Date(toDateValue);
+    toDate.setHours(23, 59, 59, 999);
+
+    filteredData = allData.filter(item => {
+      const sessionDate = new Date(item.sessionStart);
+      return (
+        sessionDate.getFullYear() === toDate.getFullYear() &&
+        sessionDate.getMonth() === toDate.getMonth() &&
+        sessionDate.getDate() === toDate.getDate()
+      );
+    });
+  }
+
+  // Show or hide tables based on the filtered data
+  const tables = ['clientTable', 'elementsTable', 'pageviewsTable'];
+  tables.forEach(tableId => {
+    document.getElementById(tableId).style.display = filteredData.length ? 'table' : 'none';
+  });
+
+  // Populate tables with filtered data
+  populateTrackingTable(filteredData);
+  populateElementsTable(filteredData);
+  populatePageviewsTable(filteredData);
+  applyColumnSearch();
+}
+
+// Listen to changes in the date input
+document.getElementById('fromDate').addEventListener('change', applyDateFilter);
+document.getElementById('toDate').addEventListener('change', applyDateFilter);
+
 
     // Column Search: show only columns whose header includes search value
     document.getElementById('columnSearch').addEventListener('input', applyColumnSearch);
@@ -496,7 +537,7 @@
     // Load clients on page load
     loadClients();
   </script>
-  <!-- Bootstrap JS Bundle -->
+ <!-- Bootstrap JS Bundle -->
    <!-- <script>
   // Column Search - show only columns whose header includes the search text
   document.getElementById('columnSearch').addEventListener('input', applyColumnSearch);
