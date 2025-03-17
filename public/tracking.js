@@ -96,21 +96,17 @@
   trackPageView();
 
   // ---- Inactivity Timeout Logic ----
-  // Set an inactivity limit (e.g., 2 minutes)
   let inactivityTimeout;
   const INACTIVITY_LIMIT = 2 * 60 * 1000; // 2 minutes
 
   function resetInactivityTimeout() {
     if (inactivityTimeout) clearTimeout(inactivityTimeout);
     inactivityTimeout = setTimeout(() => {
-      // When inactivity is detected, send a session_end event.
       sendSessionEnd();
     }, INACTIVITY_LIMIT);
   }
 
-  // Function to send session end data
   function sendSessionEnd() {
-    // Send the session end event with sendBeacon for reliability during unload.
     const payload = JSON.stringify({
       type: 'session_end',
       url: window.location.href,
@@ -120,27 +116,22 @@
     if (navigator.sendBeacon) {
       navigator.sendBeacon(trackingUrl, payload);
     } else {
-      // Fallback if sendBeacon is not available.
       fetch(trackingUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: payload
       });
     }
   }
 
-  // Reset the inactivity timer on user interactions
   ['click', 'mousemove', 'keydown'].forEach(event => {
     document.addEventListener(event, resetInactivityTimeout);
   });
-  // Start the inactivity timer initially
+
   resetInactivityTimeout();
 
   // ---- Click and Element Tracking ----
   document.addEventListener('click', function(event) {
-    // Identify the element clicked.
     let elementName = 'Unnamed Element';
 
     if (event.target.tagName === 'BUTTON') {
@@ -163,11 +154,10 @@
       });
     }
 
-    // For any element clicked, capture additional details.
     let element = event.target;
     let fullElementName = element.innerText.trim() || element.id || element.className || element.tagName;
     if (fullElementName.length > 100) {
-      fullElementName = fullElementName.substring(0, 100) + '...'; // Limit text length
+      fullElementName = fullElementName.substring(0, 100) + '...';
     }
     sendTrackingData({
       type: 'element_click',
@@ -178,6 +168,45 @@
       sessionId
     });
   });
+
+  // ---- iFrame Tracking ----
+  function trackIframeClicks(iframe) {
+    try {
+      let iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+      if (!iframeDoc) {
+        console.log("Unable to access iframe content (cross-origin issue).");
+        return;
+      }
+
+      iframeDoc.addEventListener("click", function(event) {
+        let elementName = event.target.innerText.trim() || event.target.id || event.target.className || event.target.tagName;
+        if (elementName.length > 100) {
+          elementName = elementName.substring(0, 100) + '...';
+        }
+        
+        sendTrackingData({
+          type: 'iframe_element_click',
+          elementTag: event.target.tagName.toLowerCase(),
+          elementName: elementName,
+          iframeSrc: iframe.src,
+          url: window.location.href,
+          timestamp: new Date().toISOString(),
+          sessionId
+        });
+      }, true);
+
+      console.log("Tracking clicks inside iframe:", iframe.src);
+    } catch (error) {
+      console.error("Error accessing iframe:", error);
+    }
+  }
+
+  function initializeIframeTracking() {
+    let iframes = document.querySelectorAll("iframe");
+    iframes.forEach(trackIframeClicks);
+  }
+
+  window.addEventListener("load", initializeIframeTracking);
 
   // ---- Mutation Observer for Dynamic Elements ----
   const observer = new MutationObserver((mutations) => {
@@ -192,18 +221,19 @@
             sessionId
           });
         }
+        if (node.tagName === 'IFRAME') {
+          trackIframeClicks(node);
+        }
       });
     });
   });
   observer.observe(document.body, { childList: true, subtree: true });
 
-  // Track navigation events (e.g., back/forward buttons or hash changes)
+  // ---- Track Navigation Events ----
   window.addEventListener('popstate', trackPageView);
   window.addEventListener('hashchange', trackPageView);
 
   // ---- Final Session End on Page Unload ----
-  window.addEventListener('beforeunload', function() {
-    sendSessionEnd();
-  });
+  window.addEventListener('beforeunload', sendSessionEnd);
 
 })();
