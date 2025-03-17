@@ -193,15 +193,11 @@
     <!-- Main Content -->
     <div id="mainContent">
       <div class="box d-flex justify-content-between">
-<!-- Date Range Filter -->
-<div id="filterContainer" class="mb-3">
-  <label for="fromDate"><strong>From Date:</strong></label>
-  <input type="date" id="fromDate" class="form-control" />
-
-  <label for="toDate" class="mt-2"><strong>To Date:</strong></label>
-  <input type="date" id="toDate" class="form-control" />
-</div>
-
+      <!-- Date Filter -->
+      <div id="filterContainer" class="mb-3">
+        <label for="filterDate"><strong>Select Date:</strong></label>
+        <input type="date" id="filterDate" class="form-control" />
+      </div>
 
       <!-- Column Search with Clear Button -->
       <div class="mb-3" style="max-width:250px;">
@@ -305,37 +301,28 @@
 
     // Apply date filter based on the date input value
     function applyDateFilter() {
-  const fromDate = document.getElementById('fromDate').value;
-  const toDate = document.getElementById('toDate').value;
-  
-  let filteredData = allData;
-  
-  if (fromDate && toDate) {
-    const from = new Date(fromDate);
-    const to = new Date(toDate);
-    
-    filteredData = allData.filter(item => {
-      const sessionDate = new Date(item.sessionStart);
-      return sessionDate >= from && sessionDate <= to;
-    });
-  }
-
-  if (filteredData.length === 0) {
-    document.getElementById('clientTable').style.display = 'none';
-    document.getElementById('elementsTable').style.display = 'none';
-    document.getElementById('pageviewsTable').style.display = 'none';
-  } else {
-    document.getElementById('clientTable').style.display = 'table';
-    document.getElementById('elementsTable').style.display = 'table';
-    document.getElementById('pageviewsTable').style.display = 'table';
-  }
-
-  populateTrackingTable(filteredData);
-  populateElementsTable(filteredData);
-  populatePageviewsTable(filteredData);
-  applyColumnSearch();
-}
-
+      const filterDate = document.getElementById('filterDate').value;
+      let filteredData = allData;
+      if (filterDate) {
+        filteredData = allData.filter(item => {
+          const sessionDate = new Date(item.sessionStart).toISOString().substring(0, 10);
+          return sessionDate === filterDate;
+        });
+      }
+      if (filteredData.length === 0) {
+        document.getElementById('clientTable').style.display = 'none';
+        document.getElementById('elementsTable').style.display = 'none';
+        document.getElementById('pageviewsTable').style.display = 'none';
+      } else {
+        document.getElementById('clientTable').style.display = 'table';
+        document.getElementById('elementsTable').style.display = 'table';
+        document.getElementById('pageviewsTable').style.display = 'table';
+      }
+      populateTrackingTable(filteredData);
+      populateElementsTable(filteredData);
+      populatePageviewsTable(filteredData);
+      applyColumnSearch();
+    }
 
     // Listen to changes in the date input
     document.getElementById('filterDate').addEventListener('change', applyDateFilter);
